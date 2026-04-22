@@ -1,25 +1,85 @@
-import { ModeIntro } from "@/components/runner/mode-intro";
-import { MODES } from "@/lib/constants";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Lock, ArrowRight } from "lucide-react";
+import {
+  hasFinishedMistakes,
+  getMistakesProgress,
+} from "@/lib/mock/completion";
+import { getMockWeaknessPreview } from "@/lib/mock/pick-questions";
+import { MockStartPicker } from "@/components/mock/mock-start-picker";
 
-export default function MockExamIntro() {
-  const m = MODES.mock;
-  return (
-    <ModeIntro
-      mode="mock"
-      title="Simulate the real thing."
-      blurb={m.blurb}
-      questionCount={m.questionCount}
-      durationMin={m.durationMin}
-      passPct={m.passPct}
-      startHref="/mock-exam"
-      startPath="/mock-exam/start"
-      bullets={[
-        "120 questions: 80 National + 40 South Carolina specific.",
-        "240-minute timer. Pass at 70%.",
-        "No hints, no AI chat during the exam.",
-        "Flag questions for review and use the navigator to jump around.",
-        "Auto-submits when time runs out.",
-      ]}
-    />
+export default async function MockExamIntro() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const [mistakesDone, mistakesProgress] = await Promise.all([
+    hasFinishedMistakes(supabase, user.id),
+    getMistakesProgress(supabase, user.id),
+  ]);
+
+  if (!mistakesDone) {
+    const remaining = Math.max(
+      0,
+      mistakesProgress.bestSessionThreshold - mistakesProgress.bestSessionAttempts,
+    );
+    const totalLabel =
+      mistakesProgress.bestSessionTotal > 0
+        ? mistakesProgress.bestSessionTotal
+        : 110;
+    const progressLine =
+      mistakesProgress.bestSessionAttempts > 0
+        ? `Closest Mistakes run so far: ${mistakesProgress.bestSessionAttempts} / ${totalLabel} answered. ${remaining} more to unlock Mock.`
+        : "You haven't finished a Mistakes Test yet. The 10-question smoke mode in Mistakes counts toward this gate.";
+
+    return (
+      <div className="space-y-6">
+        <section className="relative overflow-hidden rounded-3xl border border-border bg-surface p-8 md:p-12 shadow-soft">
+          <div className="absolute inset-0 mesh-gradient opacity-30" aria-hidden />
+          <div className="relative">
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 rounded-2xl bg-muted grid place-items-center">
+                <Lock className="h-5 w-5 text-ink-muted" />
+              </div>
+              <Badge variant="outline">Mock Exam is locked</Badge>
+            </div>
+            <h1 className="mt-5 font-serif text-4xl md:text-5xl font-semibold tracking-tight">
+              Finish a Mistakes Test first.
+            </h1>
+            <p className="mt-3 text-lg text-ink-muted max-w-2xl">
+              The Mock is adaptive — it weights your{" "}
+              <span className="font-medium text-ink">mistakes 3×</span>,
+              practice 2×, and assessment 1×. Without a Mistakes run, there
+              isn&apos;t enough recent signal to calibrate it honestly.
+            </p>
+            <p className="mt-2 text-sm text-ink-muted">{progressLine}</p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button asChild size="lg">
+                <Link href="/mistakes">
+                  Go to Mistakes
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  const { weakest, signalSize } = await getMockWeaknessPreview(
+    supabase,
+    user.id,
+    3,
   );
+
+  return <MockStartPicker weakest={weakest} signalSize={signalSize} />;
 }

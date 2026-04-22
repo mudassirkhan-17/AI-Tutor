@@ -31,7 +31,7 @@ const ITEMS = [
     href: "/mock-exam",
     icon: Timer,
     title: "Mock Exam",
-    blurb: "Full SC format: 120Q in 240 min.",
+    blurb: "Adaptive 120Q / 240 min. Mistakes weigh most.",
     color: "from-ink/10 to-primary/10",
   },
   {

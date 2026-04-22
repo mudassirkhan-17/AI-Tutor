@@ -42,11 +42,13 @@ export const MODES = {
   mock: {
     key: "mock",
     label: "Mock Exam",
-    blurb: "SC format: 120 questions, 240 minutes, 70% to pass.",
+    blurb:
+      "Adaptive SC-format mock: 120 questions (80 national + 40 state), 240 min, 70% to pass. Weak sections weigh more — mistakes weigh most.",
     questionCount: 120,
     timed: true,
     durationMin: 240,
     passPct: 70,
+    unlocksAfter: "mistakes",
   },
   final: {
     key: "final",
