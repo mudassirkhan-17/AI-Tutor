@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { startSession, attachQuestionsToSession } from "@/lib/runner/session";
-import {
-  pickAssessmentQuestions,
-  pickSmokeAssessmentQuestions,
-} from "@/lib/assessment/select";
+import { pickAssessmentQuestions } from "@/lib/assessment/select";
 
-const SMOKE_QUESTION_TOTAL = 2;
+const SMOKE_PER_SECTION = 2;
 
 const VALID_SECTIONS = [
   "A1","A2","A3","A4","A5","A6",
@@ -33,17 +30,15 @@ export async function POST(req: Request) {
   }
 
   const { length, sections } = parsed.data;
-  const perSection = length === "deep" ? 35 : length === "quick" ? 15 : SMOKE_QUESTION_TOTAL;
+  const perSection =
+    length === "deep" ? 35 : length === "quick" ? 15 : SMOKE_PER_SECTION;
 
   const supabase = await createClient();
-  const questions =
-    length === "smoke"
-      ? await pickSmokeAssessmentQuestions(
-          supabase,
-          sections,
-          SMOKE_QUESTION_TOTAL,
-        )
-      : await pickAssessmentQuestions(supabase, sections, perSection);
+  const questions = await pickAssessmentQuestions(
+    supabase,
+    sections,
+    perSection,
+  );
 
   if (!questions.length) {
     return NextResponse.json(
@@ -61,7 +56,7 @@ export async function POST(req: Request) {
       version: 2,
       length,
       sections,
-      per_section: length === "smoke" ? SMOKE_QUESTION_TOTAL : perSection,
+      per_section: perSection,
       question_ids: questions.map((q) => q.id),
     },
   });

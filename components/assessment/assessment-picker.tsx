@@ -27,12 +27,11 @@ type Section = {
 
 type Length = "quick" | "deep" | "smoke";
 
-const LENGTH_PER_SECTION: Record<Exclude<Length, "smoke">, number> = {
+const LENGTH_PER_SECTION: Record<Length, number> = {
   quick: 15,
   deep: 35,
+  smoke: 2,
 };
-
-const SMOKE_TOTAL = 2;
 
 export function AssessmentPicker({ sections }: { sections: Section[] }) {
   const router = useRouter();
@@ -44,10 +43,7 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
 
   const eligible = sections.filter((s) => s.count > 0);
   const allSelected = picked.size === eligible.length;
-  const totalQuestions =
-    length === "smoke"
-      ? SMOKE_TOTAL
-      : picked.size * LENGTH_PER_SECTION[length];
+  const totalQuestions = picked.size * LENGTH_PER_SECTION[length];
 
   function togglePick(code: string) {
     setPicked((prev) => {
@@ -139,8 +135,8 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
             />
             <LengthOption
               label="Smoke test"
-              minutes="~2 min"
-              detail={`Always ${SMOKE_TOTAL} questions total, pulled round-robin from the sections you select — for flows, hints, and results.`}
+              minutes="~2 min / section"
+              detail={`2 questions × selected sections (${2 * picked.size} total) — for testing flows, hints, and results.`}
               icon={<FlaskConical className="h-4 w-4" />}
               active={length === "smoke"}
               onClick={() => setLength("smoke")}
@@ -236,9 +232,7 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
               {totalQuestions.toLocaleString()} questions
             </div>
             <div className="text-ink-muted text-xs">
-              {length === "smoke"
-                ? "≈ 1–2 minutes — same 2-chance flow as a full diagnostic."
-                : `≈ ${Math.round((totalQuestions * 60) / 60)} minutes at 60 sec / question`}
+              ≈ {Math.round((totalQuestions * 60) / 60)} minutes at 60 sec / question
             </div>
           </div>
           <Button size="lg" onClick={start} disabled={pending || !picked.size}>

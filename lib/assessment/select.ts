@@ -72,55 +72,6 @@ export async function pickAssessmentQuestions(
   return out;
 }
 
-/** Exactly `count` questions, round-robin across picked sections (for smoke / dev runs). */
-export async function pickSmokeAssessmentQuestions(
-  supabase: SupabaseClient,
-  sections: string[],
-  count: number,
-): Promise<QuestionRow[]> {
-  if (count < 1 || sections.length === 0) return [];
-
-  const pools = await Promise.all(
-    sections.map(async (code) => {
-      const { data } = await supabase
-        .from("questions")
-        .select("*")
-        .eq("section_code", code)
-        .eq("pool", "standard")
-        .limit(400);
-      return shuffle((data ?? []) as QuestionRow[]);
-    }),
-  );
-
-  const idxBySection = sections.map(() => 0);
-  const used = new Set<string>();
-  const out: QuestionRow[] = [];
-
-  let cursor = 0;
-  let stall = 0;
-  const maxStall = Math.max(200, sections.length * 500);
-
-  while (out.length < count && stall < maxStall) {
-    const si = cursor % sections.length;
-    const pool = pools[si]!;
-    let took = false;
-    while (idxBySection[si]! < pool.length && out.length < count) {
-      const q = pool[idxBySection[si]!]!;
-      idxBySection[si]! += 1;
-      if (used.has(q.id)) continue;
-      out.push(q);
-      used.add(q.id);
-      took = true;
-      stall = 0;
-      break;
-    }
-    if (!took) stall += 1;
-    cursor += 1;
-  }
-
-  return out;
-}
-
 function mixForCount(n: number) {
   // 30 / 50 / 20
   const easy = Math.round(n * 0.3);
