@@ -30,12 +30,11 @@ export type ConceptMasteryRow = {
   correct: number;
   soft_miss: number;
   hard_miss: number;
-  lucky: number;
   mastered: number;
   accuracy: number;
 };
 
-export type ResultLabel = "mastered" | "lucky" | "soft_miss" | "hard_miss";
+export type ResultLabel = "mastered" | "soft_miss" | "hard_miss";
 
 export type SessionRow = {
   id: string;

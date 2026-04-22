@@ -27,7 +27,8 @@ export const MODES = {
   practice: {
     key: "practice",
     label: "Practice",
-    blurb: "110 adaptive questions with hints and retry. Build mastery.",
+    blurb:
+      "110 questions: SC national/state mix, weighted by your section mastery. Miss one and the AI writes a fresh same-concept question as a free extra try.",
     questionCount: 110,
     timed: false,
   },
@@ -35,7 +36,7 @@ export const MODES = {
     key: "mistakes",
     label: "Mistakes Test",
     blurb: "Re-drill the questions you got wrong until they stick.",
-    questionCount: 30,
+    questionCount: 110,
     timed: false,
   },
   mock: {

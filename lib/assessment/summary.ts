@@ -29,7 +29,6 @@ export type SectionStat = {
   code: string;
   total: number;
   mastered: number;
-  lucky: number;
   soft_miss: number;
   hard_miss: number;
   accuracy: number; // mastered / total
@@ -40,7 +39,6 @@ export type ConceptStat = {
   section_code: string;
   total: number;
   mastered: number;
-  lucky: number;
   soft_miss: number;
   hard_miss: number;
   accuracy: number;
@@ -49,15 +47,22 @@ export type ConceptStat = {
 export type AssessmentSummary = {
   total: number;
   mastered: number;
-  lucky: number;
   soft_miss: number;
   hard_miss: number;
   accuracy_pct: number;            // strict: mastered only
-  effective_pct: number;           // mastered + lucky + soft (would they get it on exam?)
+  effective_pct: number;           // mastered + soft_miss (recovered after hint/retry)
   sections: SectionStat[];
   weakest_concepts: ConceptStat[]; // top 5 by hard_miss desc, then soft_miss
   strongest_concepts: ConceptStat[]; // top 3 by mastered desc
 };
+
+/** Back-compat: older rows may still hold "lucky"; we count it as mastered. */
+function normalizeLabel(
+  label: ResultLabel | "lucky" | null,
+): ResultLabel | null {
+  if (label === "lucky") return "mastered";
+  return (label as ResultLabel | null) ?? null;
+}
 
 /**
  * Build a summary from raw attempts. We use the FIRST attempt per
@@ -65,12 +70,11 @@ export type AssessmentSummary = {
  * results page if needed).
  */
 export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
-  // collapse to one row per question (the labelled attempt — usually attempt_number=1
-  // when mastered, attempt_number=2 when soft/hard/lucky)
   const byQ = new Map<string, AttemptLite>();
   for (const a of attempts) {
-    if (!a.result_label) continue; // keep only labelled rows
-    byQ.set(a.question_id, a);
+    const label = normalizeLabel(a.result_label as ResultLabel | "lucky" | null);
+    if (!label) continue;
+    byQ.set(a.question_id, { ...a, result_label: label });
   }
   const rows = Array.from(byQ.values());
 
@@ -78,7 +82,6 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
   const conceptMap = new Map<string, ConceptStat>();
 
   let mastered = 0,
-    lucky = 0,
     soft = 0,
     hard = 0;
 
@@ -90,7 +93,6 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
       code: sec,
       total: 0,
       mastered: 0,
-      lucky: 0,
       soft_miss: 0,
       hard_miss: 0,
       accuracy: 0,
@@ -103,14 +105,12 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
         section_code: sec,
         total: 0,
         mastered: 0,
-        lucky: 0,
         soft_miss: 0,
         hard_miss: 0,
         accuracy: 0,
       };
       cs.total += 1;
       if (r.result_label === "mastered") cs.mastered++;
-      if (r.result_label === "lucky") cs.lucky++;
       if (r.result_label === "soft_miss") cs.soft_miss++;
       if (r.result_label === "hard_miss") cs.hard_miss++;
       cs.accuracy = cs.total ? Math.round((cs.mastered / cs.total) * 100) : 0;
@@ -120,9 +120,6 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
     if (r.result_label === "mastered") {
       ss.mastered++;
       mastered++;
-    } else if (r.result_label === "lucky") {
-      ss.lucky++;
-      lucky++;
     } else if (r.result_label === "soft_miss") {
       ss.soft_miss++;
       soft++;
@@ -149,7 +146,7 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
     .filter((c) => c.hard_miss + c.soft_miss > 0)
     .sort(
       (a, b) =>
-        b.hard_miss * 2 + b.soft_miss + b.lucky - (a.hard_miss * 2 + a.soft_miss + a.lucky),
+        b.hard_miss * 2 + b.soft_miss - (a.hard_miss * 2 + a.soft_miss),
     )
     .slice(0, 5);
   const strongest_concepts = [...concepts]
@@ -160,12 +157,11 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
   return {
     total,
     mastered,
-    lucky,
     soft_miss: soft,
     hard_miss: hard,
     accuracy_pct: total ? Math.round((mastered / total) * 100) : 0,
     effective_pct: total
-      ? Math.round(((mastered + lucky + soft) / total) * 100)
+      ? Math.round(((mastered + soft) / total) * 100)
       : 0,
     sections,
     weakest_concepts,

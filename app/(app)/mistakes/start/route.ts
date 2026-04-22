@@ -1,22 +1,73 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { startSession } from "@/lib/runner/session";
+import { createClient } from "@/lib/supabase/server";
+import { hasFinishedPractice } from "@/lib/practice/completion";
 import {
-  startSession,
-  getQuestionsForMode,
-  attachQuestionsToSession,
-} from "@/lib/runner/session";
+  pickMistakesQuestions,
+  MISTAKES_TOTAL,
+  MISTAKES_SMOKE_TOTAL,
+} from "@/lib/mistakes/pick-questions";
 
-export async function POST() {
-  const qs = await getQuestionsForMode("mistakes", { count: 30 });
-  if (!qs.length) {
+const Body = z
+  .object({
+    length: z.enum(["full", "smoke"]).optional().default("full"),
+  })
+  .optional()
+  .default({ length: "full" });
+
+export async function POST(req: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const practiceDone = await hasFinishedPractice(supabase, user.id);
+  if (!practiceDone) {
     return NextResponse.json(
-      { error: "Your mistake pool is empty. Finish some practice first." },
+      {
+        error:
+          "Finish a practice run first (full 110 or 10-question smoke) to unlock the Mistakes Test.",
+      },
+      { status: 403 },
+    );
+  }
+
+  const json = await req.json().catch(() => ({}));
+  const parsed = Body.safeParse(json);
+  const length = parsed.success ? parsed.data.length : "full";
+  const total =
+    length === "smoke" ? MISTAKES_SMOKE_TOTAL : MISTAKES_TOTAL;
+
+  const { questions, mistakeCount, fillerCount, origins } =
+    await pickMistakesQuestions(supabase, user.id, total);
+  if (!questions.length) {
+    return NextResponse.json(
+      { error: "No questions available. Import your CSV first." },
       { status: 400 },
     );
   }
+
   const { sessionId } = await startSession({
     mode: "mistakes",
-    config: { question_ids: qs.map((q) => q.id) },
+    config: {
+      question_ids: questions.map((q) => q.id),
+      mistakes_count: mistakeCount,
+      filler_count: fillerCount,
+      question_origins: origins,
+      length,
+      target_total: total,
+    },
   });
-  await attachQuestionsToSession(sessionId, qs.map((q) => q.id));
-  return NextResponse.json({ sessionId, runnerPath: `/mistakes/${sessionId}` });
+
+  return NextResponse.json({
+    sessionId,
+    runnerPath: `/mistakes/${sessionId}`,
+    length,
+    total,
+    composition: { mistakes: mistakeCount, filler: fillerCount },
+  });
 }

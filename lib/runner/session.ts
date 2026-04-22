@@ -118,7 +118,7 @@ export async function getQuestionsForMode(
     return shuffle(combined);
   }
 
-  // practice (default): shuffle across standard pool
+  // practice: callers should use pickPracticeQuestions() from lib/practice/pick-questions.ts
   const { data } = await supabase
     .from("questions")
     .select("*")

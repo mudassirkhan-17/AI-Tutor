@@ -57,12 +57,7 @@ const LABEL_COPY: Record<ResultLabel, { title: string; tone: string; sub: string
   mastered: {
     title: "Mastered",
     tone: "text-success",
-    sub: "First try, no hint. Locked in.",
-  },
-  lucky: {
-    title: "Lucky",
-    tone: "text-warn",
-    sub: "Got it on first try with the hint — we'll re-test this concept.",
+    sub: "First-try correct. Locked in.",
   },
   soft_miss: {
     title: "Soft miss",
@@ -162,7 +157,9 @@ export function AssessmentRunner({
 
     if (s.phase === "ask") {
       if (isCorrect) {
-        // mastered
+        // First-try correct (with or without a proactively-shown hint) =
+        // mastered. Hint usage is captured in the `hinted` column but does
+        // not downgrade the label.
         const label: ResultLabel = "mastered";
         setCurrent({
           selected: letter,
@@ -170,7 +167,7 @@ export function AssessmentRunner({
           phase: "feedback",
           label,
         });
-        recordAttempt(1, letter, true, label, false);
+        recordAttempt(1, letter, true, label, !!s.hint);
         return;
       }
       // wrong first → log attempt 1, show hint, allow second try
@@ -197,11 +194,10 @@ export function AssessmentRunner({
   }
 
   async function requestHintBeforeAnswer() {
-    // Used the hint pre-emptively (before any wrong answer)
+    // Show a hint proactively. Using the hint before answering does NOT
+    // penalize the student — first-try correct is still "mastered".
     if (s.phase !== "ask" || s.hint) return;
     await fetchHint(null);
-    // If they then get it right, we'll mark as "lucky"
-    setCurrent({ phase: "hint", firstSelected: null });
   }
 
   function next() {
@@ -217,25 +213,11 @@ export function AssessmentRunner({
     }
   }
 
-  // If we entered "hint" via requestHintBeforeAnswer (no firstSelected),
-  // a correct second answer is "lucky" not "soft_miss".
-  React.useEffect(() => {
-    if (
-      s.phase === "feedback" &&
-      s.firstSelected === null &&
-      s.label === "soft_miss"
-    ) {
-      setCurrent({ label: "lucky" });
-    }
-  }, [s.phase, s.firstSelected, s.label, setCurrent]);
-
   async function finish() {
     if (finishing) return;
     setFinishing(true);
 
-    // Score = % mastered + lucky on first attempt mapping:
-    //   correct on attempt 1 (mastered) counts 1.0
-    //   lucky / soft / hard count 0
+    // Score = % mastered; soft/hard misses count 0.
     const correct = states.filter((x) => x.label === "mastered").length;
     const score = pct(correct, total);
 
@@ -276,7 +258,6 @@ export function AssessmentRunner({
   // Live counters
   const counts = {
     mastered: states.filter((x) => x.label === "mastered").length,
-    lucky: states.filter((x) => x.label === "lucky").length,
     soft: states.filter((x) => x.label === "soft_miss").length,
     hard: states.filter((x) => x.label === "hard_miss").length,
   };
@@ -291,7 +272,6 @@ export function AssessmentRunner({
             <span className="text-ink-muted">/ {total}</span>
           </span>
           <Counter label="Mastered" n={counts.mastered} tone="text-success" />
-          <Counter label="Lucky" n={counts.lucky} tone="text-warn" />
           <Counter label="Soft miss" n={counts.soft} tone="text-warn" />
           <Counter label="Hard miss" n={counts.hard} tone="text-danger" />
         </div>
@@ -458,7 +438,7 @@ export function AssessmentRunner({
               >
                 <div className="rounded-2xl border border-border bg-elevated p-4">
                   <div className="flex items-center gap-2">
-                    {s.label === "mastered" || s.label === "lucky" ? (
+                    {s.label === "mastered" ? (
                       <CheckCircle2 className={cn("h-4 w-4", LABEL_COPY[s.label].tone)} />
                     ) : (
                       <AlertTriangle className={cn("h-4 w-4", LABEL_COPY[s.label].tone)} />

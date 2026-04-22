@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Lightbulb,
   FlaskConical,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,13 @@ type Section = {
   count: number;
 };
 
+type Coverage = {
+  covered: string[];
+  missing: string[];
+  allCovered: boolean;
+  nextSection: string | null;
+};
+
 type Length = "quick" | "deep" | "smoke";
 
 const LENGTH_PER_SECTION: Record<Length, number> = {
@@ -33,13 +41,32 @@ const LENGTH_PER_SECTION: Record<Length, number> = {
   smoke: 2,
 };
 
-export function AssessmentPicker({ sections }: { sections: Section[] }) {
+export function AssessmentPicker({
+  sections,
+  initialPicked,
+  coverage,
+}: {
+  sections: Section[];
+  initialPicked?: string[];
+  coverage?: Coverage;
+}) {
   const router = useRouter();
   const [length, setLength] = React.useState<Length>("quick");
-  const [picked, setPicked] = React.useState<Set<string>>(
-    () => new Set(sections.filter((s) => s.count > 0).map((s) => s.code)),
-  );
+  const [picked, setPicked] = React.useState<Set<string>>(() => {
+    if (initialPicked && initialPicked.length) {
+      const eligibleCodes = new Set(
+        sections.filter((s) => s.count > 0).map((s) => s.code),
+      );
+      return new Set(initialPicked.filter((c) => eligibleCodes.has(c)));
+    }
+    return new Set(sections.filter((s) => s.count > 0).map((s) => s.code));
+  });
   const [pending, setPending] = React.useState(false);
+
+  const coveredSet = React.useMemo(
+    () => new Set(coverage?.covered ?? []),
+    [coverage?.covered],
+  );
 
   const eligible = sections.filter((s) => s.count > 0);
   const allSelected = picked.size === eligible.length;
@@ -85,6 +112,13 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
     }
   }
 
+  const coveredCount = coverage?.covered.length ?? 0;
+  const totalSections = sections.length;
+  const progressPct = totalSections
+    ? Math.round((100 * coveredCount) / totalSections)
+    : 0;
+  const showCoverage = !!coverage && !coverage.allCovered;
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -99,16 +133,49 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
               <Target className="h-5 w-5 text-primary" />
             </div>
             <Badge variant="outline">Assessment</Badge>
+            {coverage?.allCovered && (
+              <Badge variant="outline" className="text-success border-success/30">
+                All sections covered
+              </Badge>
+            )}
           </div>
           <h1 className="mt-5 font-serif text-5xl font-semibold tracking-tight">
-            Find out where you stand.
+            {coverage?.allCovered
+              ? "You've mapped every section."
+              : "Find out where you stand."}
           </h1>
           <p className="mt-3 text-lg text-ink-muted max-w-2xl">
-            We&apos;ll measure each section you pick — easy, medium, and hard
-            mixed. Get one wrong? You&apos;ll see a hint and one more chance.
-            Your answers (mastered, lucky, soft miss, hard miss) shape every
-            study mode that follows.
+            {coverage?.allCovered
+              ? "Every section has a baseline. Retake any section to refresh your scores, or jump straight into Practice."
+              : "We'll measure each section you pick — easy, medium, and hard mixed. Get one wrong? You'll see a hint and one more chance. Practice unlocks once every section has a baseline."}
           </p>
+
+          {showCoverage && coverage && (
+            <div className="mt-6 rounded-2xl border border-border bg-elevated/60 p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 text-sm">
+                  <Lock className="h-4 w-4 text-ink-muted" />
+                  <span className="font-medium text-ink">
+                    Practice unlocks at 12/12 sections
+                  </span>
+                  <span className="text-ink-muted">
+                    · {coveredCount}/{totalSections} done
+                  </span>
+                </div>
+                {coverage.nextSection && (
+                  <span className="text-xs text-ink-muted">
+                    Next up: <b className="text-ink">{coverage.nextSection}</b>
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -167,6 +234,7 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
             {sections.map((s) => {
               const disabled = s.count === 0;
               const active = picked.has(s.code);
+              const done = coveredSet.has(s.code);
               return (
                 <button
                   key={s.code}
@@ -197,9 +265,16 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
                     </div>
                     <div className="text-xs text-ink-muted">
                       {s.group} · {s.count.toLocaleString()} questions
+                      {done && (
+                        <span className="ml-1 text-success">· assessed</span>
+                      )}
                     </div>
                   </div>
-                  {active && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                  {active ? (
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  ) : done ? (
+                    <CheckCircle2 className="h-4 w-4 text-success/70 shrink-0" />
+                  ) : null}
                 </button>
               );
             })}
@@ -215,7 +290,7 @@ export function AssessmentPicker({ sections }: { sections: Section[] }) {
           </h3>
           <ul className="space-y-2.5 text-sm text-ink-muted">
             <li className="flex gap-2"><Dot /> First try right (no hint) → <b className="text-success">mastered</b>.</li>
-            <li className="flex gap-2"><Dot /> First try right (after hint) → <b className="text-warn">lucky</b>. We&apos;ll re-test the concept.</li>
+            <li className="flex gap-2"><Dot /> Hint used then right → still counts as <b className="text-success">mastered</b>; using the hint is encouraged.</li>
             <li className="flex gap-2"><Dot /> Second try right after a wrong → <b className="text-warn">soft miss</b>. Reachable.</li>
             <li className="flex gap-2"><Dot /> Wrong twice → <b className="text-danger">hard miss</b>. We&apos;ll teach this from scratch.</li>
             <li className="flex gap-2"><Dot /> No section is auto-revealed. Hints come from AI, tailored to the question.</li>

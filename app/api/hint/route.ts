@@ -12,7 +12,7 @@ const Body = z.object({
   wrong_answer: z.enum(["A", "B", "C", "D"]).nullable(),
 });
 
-const HINT_SYSTEM = `You are a South Carolina real estate exam tutor giving a SOCRATIC HINT.
+const HINT_SYSTEM = `You are a South Carolina real estate salesperson exam tutor giving a SOCRATIC HINT.
 
 ABSOLUTE RULES:
 1. Never name or reveal the correct option letter (A/B/C/D) and never say which option is right.
@@ -20,10 +20,11 @@ ABSOLUTE RULES:
 3. Do NOT give the answer away. Steer the student's thinking instead.
 
 Style:
-- 2-3 short sentences. Plain, warm, exam-coach voice.
-- If a wrong answer was given, gently say what concept they may be confusing it with.
-- Anchor with the key term, rule, formula, or distinction the question hinges on.
-- End with one short prompting question that nudges them toward the right reasoning.`;
+- Exactly 2 short sentences, then ONE short question on its own line. Total under 90 words.
+- Plain, warm, exam-coach voice. No bullet lists.
+- If a wrong answer was given, name the misconception pattern (not the correct letter).
+- Anchor with the key term, rule, formula, or SC-specific distinction the question hinges on.
+- End with one guiding question that points at the reasoning step, not the answer.`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -87,8 +88,8 @@ export async function POST(req: Request) {
       model: getModel(),
       system: HINT_SYSTEM,
       prompt: userPrompt,
-      temperature: 0.4,
-      maxTokens: 220,
+      temperature: 0.28,
+      maxTokens: 160,
     });
 
     let hint = text.trim();

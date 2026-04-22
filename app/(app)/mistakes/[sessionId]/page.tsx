@@ -1,5 +1,6 @@
-import { QuestionRunner } from "@/components/runner/question-runner";
+import { PracticeRunner } from "@/components/runner/practice-runner";
 import { loadSessionAndQuestions } from "@/lib/runner/loader";
+import type { QuestionOrigin } from "@/lib/mistakes/pick-questions";
 
 export default async function MistakesRunner({
   params,
@@ -10,15 +11,20 @@ export default async function MistakesRunner({
   const { session, questions } = await loadSessionAndQuestions(sessionId);
   const startedAt = new Date(session.started_at).getTime();
 
+  const origins =
+    ((session.config as Record<string, unknown> | null)?.question_origins as
+      | Record<string, QuestionOrigin>
+      | undefined) ?? {};
+
   return (
-    <QuestionRunner
+    <PracticeRunner
       sessionId={sessionId}
-      mode="mistakes"
       questions={questions}
-      timed={null}
       startedAt={startedAt}
-      behavior="reveal"
       resultsPath={`/mistakes/${sessionId}/results`}
+      mode="mistakes"
+      siblingDifficulty="harder"
+      questionOrigins={origins}
     />
   );
 }

@@ -95,7 +95,7 @@ export async function generateTutorLetter(
   const weak = summary.weakest_concepts
     .map(
       (c) =>
-        `- ${humanizeConcept(c.concept_id)} (${c.hard_miss} hard miss, ${c.soft_miss} soft, ${c.lucky} lucky out of ${c.total})`,
+        `- ${humanizeConcept(c.concept_id)} (${c.hard_miss} hard miss, ${c.soft_miss} soft miss out of ${c.total})`,
     )
     .join("\n");
   const strong = summary.strongest_concepts
@@ -113,9 +113,8 @@ export async function generateTutorLetter(
   const prompt = `STUDENT RESULTS
 
 Total questions: ${summary.total}
-Mastered (first try, no hint): ${summary.mastered} (${summary.accuracy_pct}%)
-Lucky (right after hint): ${summary.lucky}
-Soft miss (right on second try): ${summary.soft_miss}
+Mastered (first try): ${summary.mastered} (${summary.accuracy_pct}%)
+Soft miss (right on second try or after hint): ${summary.soft_miss}
 Hard miss (wrong both tries): ${summary.hard_miss}
 Effective accuracy (would likely get on exam): ${summary.effective_pct}%
 

@@ -2,6 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getUserStats } from "@/lib/kpi/stats";
+import {
+  getAssessmentCoverage,
+  type AssessmentCoverage,
+} from "@/lib/assessment/coverage";
+import { hasFinishedPractice } from "@/lib/practice/completion";
+import { SECTIONS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +41,19 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  const stats = await getUserStats(user.id);
+  const [stats, coverage, practiceComplete] = await Promise.all([
+    getUserStats(user.id),
+    getAssessmentCoverage(supabase, user.id),
+    hasFinishedPractice(supabase, user.id),
+  ]);
   const firstName = (profile?.full_name ?? user.email ?? "")
     .split(/[\s@]/)[0]
-    ?.replace(/^./, (c) => c.toUpperCase());
+    ?.replace(/^./, (c: string) => c.toUpperCase());
 
-  const next = getNextBestAction(stats);
+  const next = getNextBestAction(stats, coverage, practiceComplete);
+  const continueAssessmentHref = coverage.missing.length
+    ? `/assessment?sections=${coverage.missing.join(",")}`
+    : "/assessment";
 
   return (
     <div className="space-y-8">
@@ -53,9 +66,19 @@ export default async function DashboardPage() {
           </h1>
         </div>
         <div className="flex gap-2">
-          <Button asChild>
-            <Link href="/practice">Start practice</Link>
-          </Button>
+          {coverage.allCovered ? (
+            <Button asChild>
+              <Link href="/practice">Start practice</Link>
+            </Button>
+          ) : (
+            <Button asChild>
+              <Link href={continueAssessmentHref}>
+                {coverage.nextSection
+                  ? `Continue assessment · ${coverage.nextSection}`
+                  : "Continue assessment"}
+              </Link>
+            </Button>
+          )}
           <Button asChild variant="outline">
             <Link href="/mock-exam">Mock exam</Link>
           </Button>
@@ -275,13 +298,21 @@ export default async function DashboardPage() {
                   You have {stats.unresolvedMistakes} unresolved mistake{stats.unresolvedMistakes === 1 ? "" : "s"}.
                 </p>
                 <p className="text-sm text-ink-muted">
-                  Drill them until they stick.
+                  {practiceComplete
+                    ? "Drill them until they stick."
+                    : "Mistakes Test unlocks after you finish one full practice run (110 questions)."}
                 </p>
               </div>
             </div>
-            <Button asChild variant="outline">
-              <Link href="/mistakes">Start Mistakes Test</Link>
-            </Button>
+            {practiceComplete ? (
+              <Button asChild variant="outline">
+                <Link href="/mistakes">Start Mistakes Test</Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href="/practice">Finish Practice first</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -289,7 +320,11 @@ export default async function DashboardPage() {
   );
 }
 
-function getNextBestAction(stats: Awaited<ReturnType<typeof getUserStats>>) {
+function getNextBestAction(
+  stats: Awaited<ReturnType<typeof getUserStats>>,
+  coverage: AssessmentCoverage,
+  practiceComplete: boolean,
+) {
   if (stats.totalAttempts === 0) {
     return {
       title: "Take the 24-question Assessment.",
@@ -298,7 +333,34 @@ function getNextBestAction(stats: Awaited<ReturnType<typeof getUserStats>>) {
       href: "/assessment",
     };
   }
+  if (!coverage.allCovered) {
+    const next = coverage.nextSection;
+    const nextTitle = next
+      ? SECTIONS.find((s) => s.code === next)?.title ?? ""
+      : "";
+    const continueHref = coverage.missing.length
+      ? `/assessment?sections=${coverage.missing.join(",")}`
+      : "/assessment";
+    const left = coverage.missing.length;
+    return {
+      title: next
+        ? `Finish the assessment — ${next}: ${nextTitle} is next.`
+        : "Finish the assessment to unlock Practice.",
+      detail: `Practice adapts to your weak spots, but needs a baseline on every section first. ${left} section${left === 1 ? "" : "s"} to go.`,
+      cta: next ? `Continue with ${next}` : "Continue assessment",
+      href: continueHref,
+    };
+  }
   if (stats.unresolvedMistakes >= 5) {
+    if (!practiceComplete) {
+      return {
+        title: `You have ${stats.unresolvedMistakes} mistakes queued — Mistakes unlocks after Practice.`,
+        detail:
+          "Complete one full 110-question practice session. Then you can re-drill your personal mistake pool.",
+        cta: "Start Practice",
+        href: "/practice",
+      };
+    }
     return {
       title: `Drill your ${stats.unresolvedMistakes} unresolved mistakes.`,
       detail: "Nothing moves the needle faster than fixing the same misses.",

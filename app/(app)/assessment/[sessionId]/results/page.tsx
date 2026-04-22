@@ -4,6 +4,7 @@ import { AssessmentReport } from "@/components/assessment/assessment-report";
 import { buildSummary } from "@/lib/assessment/summary";
 import type { AssessmentSummary, RawAttempt } from "@/lib/assessment/summary";
 import { SECTIONS } from "@/lib/constants";
+import { getAssessmentCoverage } from "@/lib/assessment/coverage";
 
 export default async function AssessmentResults({
   params,
@@ -71,6 +72,8 @@ export default async function AssessmentResults({
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
 
+  const coverage = await getAssessmentCoverage(supabase, user.id);
+
   return (
     <AssessmentReport
       sessionId={sessionId}
@@ -85,6 +88,7 @@ export default async function AssessmentResults({
       lengthLabel={
         (config.length as "quick" | "deep" | "smoke" | undefined) ?? null
       }
+      coverage={coverage}
     />
   );
 }

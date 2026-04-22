@@ -38,7 +38,6 @@ type Tone = "success" | "warn-strong" | "warn-soft" | "danger";
 
 const LABELS = {
   mastered: "Locked in",
-  lucky: "Hint helped",
   soft_miss: "Recovered",
   hard_miss: "Needs review",
 } as const;
@@ -70,6 +69,13 @@ const TONES: Record<Tone, { text: string; bg: string; ring: string; soft: string
   },
 };
 
+type Coverage = {
+  covered: string[];
+  missing: string[];
+  allCovered: boolean;
+  nextSection: string | null;
+};
+
 type Props = {
   sessionId: string;
   durationMs: number;
@@ -79,6 +85,7 @@ type Props = {
   sectionTitles: Record<string, string>;
   attempts: RawAttempt[];
   lengthLabel: "quick" | "deep" | "smoke" | null;
+  coverage: Coverage;
 };
 
 export function AssessmentReport({
@@ -90,6 +97,7 @@ export function AssessmentReport({
   sectionTitles,
   attempts,
   lengthLabel,
+  coverage,
 }: Props) {
   void sessionId;
   const strict = summary.accuracy_pct;
@@ -102,6 +110,20 @@ export function AssessmentReport({
         : lengthLabel === "quick"
           ? "Quick check"
           : null;
+
+  const nextSection = coverage.nextSection;
+  const nextTitle = nextSection
+    ? sectionTitles[nextSection] ?? ""
+    : "";
+  const continueHref = coverage.missing.length
+    ? `/assessment?sections=${coverage.missing.join(",")}`
+    : "/assessment";
+  const primaryCtaHref = coverage.allCovered ? "/practice" : continueHref;
+  const primaryCtaLabel = coverage.allCovered
+    ? "Start practice"
+    : nextSection
+      ? `Continue with ${nextSection}`
+      : "Continue assessment";
 
   return (
     <div className="space-y-6">
@@ -132,8 +154,8 @@ export function AssessmentReport({
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
               <Button asChild>
-                <Link href="/practice">
-                  <ArrowRight className="h-4 w-4" /> Start practice
+                <Link href={primaryCtaHref}>
+                  <ArrowRight className="h-4 w-4" /> {primaryCtaLabel}
                 </Link>
               </Button>
               <Button asChild variant="ghost">
@@ -166,39 +188,38 @@ export function AssessmentReport({
           </div>
 
           <ExamReadinessBar strict={strict} reach={reach} />
+
+          <CoverageNotice
+            coverage={coverage}
+            continueHref={continueHref}
+            nextSection={nextSection}
+            nextTitle={nextTitle}
+          />
         </div>
       </section>
 
       {/* OUTCOME TILES */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <StatTile
           icon={Lock}
           label={LABELS.mastered}
-          sub="First try, no hint."
+          sub="First try, no help needed."
           value={summary.mastered}
           total={summary.total}
           tone="success"
         />
         <StatTile
-          icon={Lightbulb}
-          label={LABELS.lucky}
-          sub="Right with a nudge."
-          value={summary.lucky}
+          icon={TrendingUp}
+          label={LABELS.soft_miss}
+          sub="Right after the hint / retry."
+          value={summary.soft_miss}
           total={summary.total}
           tone="warn-strong"
         />
         <StatTile
-          icon={TrendingUp}
-          label={LABELS.soft_miss}
-          sub="Right on second try."
-          value={summary.soft_miss}
-          total={summary.total}
-          tone="warn-soft"
-        />
-        <StatTile
           icon={BookOpen}
           label={LABELS.hard_miss}
-          sub="Missed twice."
+          sub="Missed both tries."
           value={summary.hard_miss}
           total={summary.total}
           tone="danger"
@@ -206,7 +227,15 @@ export function AssessmentReport({
       </section>
 
       {/* TUTOR LETTER */}
-      {tutorLetter && <TutorLetter text={tutorLetter} />}
+      {tutorLetter && (
+        <TutorLetter
+          text={tutorLetter}
+          primaryHref={primaryCtaHref}
+          primaryLabel={
+            coverage.allCovered ? "Practice weak topics" : primaryCtaLabel
+          }
+        />
+      )}
 
       {/* SECTION BREAKDOWN */}
       <SectionBreakdown summary={summary} sectionTitles={sectionTitles} />
@@ -220,9 +249,17 @@ export function AssessmentReport({
                 <AlertTriangle className="h-4 w-4 text-danger" />
                 <h3 className="font-semibold">Top to drill next</h3>
               </div>
-              <Button asChild size="sm" variant="soft">
-                <Link href="/practice">Practice these</Link>
-              </Button>
+              {coverage.allCovered ? (
+                <Button asChild size="sm" variant="soft">
+                  <Link href="/practice">Practice these</Link>
+                </Button>
+              ) : (
+                <Button asChild size="sm" variant="soft">
+                  <Link href={continueHref}>
+                    {nextSection ? `Continue with ${nextSection}` : "Continue assessment"}
+                  </Link>
+                </Button>
+              )}
             </div>
             {summary.weakest_concepts.length === 0 ? (
               <p className="text-sm text-ink-muted">
@@ -284,6 +321,69 @@ export function AssessmentReport({
 
 /* ---------------- Hero helpers ---------------- */
 
+function CoverageNotice({
+  coverage,
+  continueHref,
+  nextSection,
+  nextTitle,
+}: {
+  coverage: Coverage;
+  continueHref: string;
+  nextSection: string | null;
+  nextTitle: string;
+}) {
+  const total = coverage.covered.length + coverage.missing.length;
+  const done = coverage.covered.length;
+  const pct = total ? Math.round((100 * done) / total) : 0;
+
+  if (coverage.allCovered) {
+    return (
+      <div className="mt-5 rounded-2xl border border-success/30 bg-success/5 p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-sm">
+          <CheckCircle2 className="h-4 w-4 text-success" />
+          <span className="font-medium text-ink">
+            All 12 sections assessed — Practice is unlocked.
+          </span>
+        </div>
+        <Button asChild size="sm">
+          <Link href="/practice">
+            <ArrowRight className="h-3.5 w-3.5" /> Start practice
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 rounded-2xl border border-border bg-elevated/60 p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-sm">
+          <Lock className="h-4 w-4 text-ink-muted" />
+          <span className="font-medium text-ink">
+            Practice unlocks at 12/12 sections
+          </span>
+          <span className="text-ink-muted">· {done}/{total} done</span>
+        </div>
+        {nextSection && (
+          <Button asChild size="sm" variant="outline">
+            <Link href={continueHref}>
+              Continue with {nextSection}
+              {nextTitle ? `: ${nextTitle}` : ""}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        )}
+      </div>
+      <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full bg-primary transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function CompositionRing({ summary }: { summary: AssessmentSummary }) {
   const size = 176;
   const stroke = 18;
@@ -293,8 +393,7 @@ function CompositionRing({ summary }: { summary: AssessmentSummary }) {
 
   const segs = [
     { value: pct(summary.mastered), cls: "text-success", opacity: 1 },
-    { value: pct(summary.lucky), cls: "text-warn", opacity: 0.95 },
-    { value: pct(summary.soft_miss), cls: "text-warn", opacity: 0.4 },
+    { value: pct(summary.soft_miss), cls: "text-warn", opacity: 0.9 },
     { value: pct(summary.hard_miss), cls: "text-danger", opacity: 1 },
   ];
 
@@ -514,7 +613,15 @@ function StatTile({
 
 /* ---------------- Tutor letter ---------------- */
 
-function TutorLetter({ text }: { text: string }) {
+function TutorLetter({
+  text,
+  primaryHref,
+  primaryLabel,
+}: {
+  text: string;
+  primaryHref: string;
+  primaryLabel: string;
+}) {
   return (
     <section className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/5 via-surface to-surface p-6 md:p-8 shadow-soft">
       <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
@@ -537,8 +644,8 @@ function TutorLetter({ text }: { text: string }) {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild size="sm">
-              <Link href="/practice">
-                <ArrowRight className="h-3.5 w-3.5" /> Practice weak topics
+              <Link href={primaryHref}>
+                <ArrowRight className="h-3.5 w-3.5" /> {primaryLabel}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
@@ -626,7 +733,7 @@ function SectionRow({
 }) {
   const s = row;
   const reach = s.total
-    ? Math.round((100 * (s.mastered + s.lucky + s.soft_miss)) / s.total)
+    ? Math.round((100 * (s.mastered + s.soft_miss)) / s.total)
     : 0;
   return (
     <div className="rounded-xl border border-border bg-surface p-3">
@@ -654,8 +761,7 @@ function SectionRow({
       </div>
       <div className="mt-2 h-2.5 w-full rounded-full bg-muted overflow-hidden flex">
         <Bar n={s.mastered} total={s.total} color="bg-success" />
-        <Bar n={s.lucky} total={s.total} color="bg-warn" />
-        <Bar n={s.soft_miss} total={s.total} color="bg-warn/30" />
+        <Bar n={s.soft_miss} total={s.total} color="bg-warn" />
         <Bar n={s.hard_miss} total={s.total} color="bg-danger" />
       </div>
     </div>
@@ -666,8 +772,7 @@ function Legend() {
   return (
     <div className="mt-5 flex items-center gap-4 flex-wrap text-xs text-ink-muted">
       <LegendDot color="bg-success" label={LABELS.mastered} />
-      <LegendDot color="bg-warn" label={LABELS.lucky} />
-      <LegendDot color="bg-warn/30" label={LABELS.soft_miss} />
+      <LegendDot color="bg-warn" label={LABELS.soft_miss} />
       <LegendDot color="bg-danger" label={LABELS.hard_miss} />
     </div>
   );
@@ -736,7 +841,6 @@ function ConceptRow({
             {concept.section_code} · {concept.mastered}/{concept.total} clean
             {concept.hard_miss > 0 && ` · ${concept.hard_miss} missed twice`}
             {concept.soft_miss > 0 && ` · ${concept.soft_miss} recovered`}
-            {concept.lucky > 0 && ` · ${concept.lucky} with hint`}
           </div>
         </div>
       </div>
@@ -788,30 +892,24 @@ function ReviewRow({
   const Icon =
     label === "mastered"
       ? CheckCircle2
-      : label === "lucky"
-        ? Lightbulb
-        : label === "soft_miss"
-          ? AlertTriangle
-          : XCircle;
+      : label === "soft_miss"
+        ? AlertTriangle
+        : XCircle;
   const iconTone =
     label === "mastered"
       ? "text-success bg-success/15"
-      : label === "lucky"
+      : label === "soft_miss"
         ? "text-warn bg-warn/15"
-        : label === "soft_miss"
-          ? "text-warn bg-warn/10"
-          : "text-danger bg-danger/15";
+        : "text-danger bg-danger/15";
 
   const friendlyLabel =
     label === "mastered"
       ? LABELS.mastered
-      : label === "lucky"
-        ? LABELS.lucky
-        : label === "soft_miss"
-          ? LABELS.soft_miss
-          : label === "hard_miss"
-            ? LABELS.hard_miss
-            : "";
+      : label === "soft_miss"
+        ? LABELS.soft_miss
+        : label === "hard_miss"
+          ? LABELS.hard_miss
+          : "";
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">

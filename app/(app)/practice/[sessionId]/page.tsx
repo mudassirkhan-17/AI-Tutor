@@ -1,7 +1,7 @@
-import { QuestionRunner } from "@/components/runner/question-runner";
+import { PracticeRunner } from "@/components/runner/practice-runner";
 import { loadSessionAndQuestions } from "@/lib/runner/loader";
 
-export default async function PracticeRunner({
+export default async function PracticeRunnerPage({
   params,
 }: {
   params: Promise<{ sessionId: string }>;
@@ -11,13 +11,10 @@ export default async function PracticeRunner({
   const startedAt = new Date(session.started_at).getTime();
 
   return (
-    <QuestionRunner
+    <PracticeRunner
       sessionId={sessionId}
-      mode="practice"
       questions={questions}
-      timed={null}
       startedAt={startedAt}
-      behavior="practice"
       resultsPath={`/practice/${sessionId}/results`}
     />
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Mail, Lock, LogIn, UserPlus } from "lucide-react";
+import { Loader2, Mail, Lock, LogIn, UserPlus, Zap } from "lucide-react";
 
 type Mode = "login" | "signup";
 
@@ -20,7 +20,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [pending, start] = useTransition();
+  /** Synchronous guard — useTransition's pending is too late to stop double-submit rate limits. */
+  const inFlight = useRef(false);
+  const [busy, setBusy] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
 
   const title = mode === "login" ? "Welcome back" : "Create your account";
@@ -35,56 +37,127 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   async function handleEmailPassword(e: React.FormEvent) {
     e.preventDefault();
-    start(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
       const supabase = createClient();
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${location.origin}/auth/callback?next=${redirectTo}`,
+            emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
             data: { full_name: fullName },
           },
         });
-        if (error) return toast.error(error.message);
-        toast.success("Check your email to confirm your account.");
+        if (error) {
+          toast.error(formatAuthError(error.message));
+          return;
+        }
+        if (data.session) {
+          toast.success("Welcome! You're signed in.");
+          router.replace(redirectTo);
+          router.refresh();
+          return;
+        }
+        toast.success(
+          "Check your email for a confirmation link, then log in here.",
+        );
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) return toast.error(error.message);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          toast.error(formatAuthError(error.message));
+          return;
+        }
         toast.success("Welcome back.");
         router.replace(redirectTo);
         router.refresh();
       }
-    });
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   }
 
   async function handleMagicLink() {
     if (!email) return toast.error("Enter your email first.");
-    start(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${location.origin}/auth/callback?next=${redirectTo}`,
+          emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
-      if (error) return toast.error(error.message);
+      if (error) {
+        toast.error(formatAuthError(error.message));
+        return;
+      }
       setMagicSent(true);
       toast.success("Magic link sent. Check your inbox.");
-    });
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function handleDemo() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/demo", { method: "POST" });
+      const json = (await res.json().catch(() => ({}))) as {
+        email?: string;
+        password?: string;
+        error?: string;
+      };
+      if (!res.ok || !json.email || !json.password) {
+        toast.error(json.error ?? "Could not start demo session.");
+        return;
+      }
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: json.email,
+        password: json.password,
+      });
+      if (error) {
+        toast.error(formatAuthError(error.message));
+        return;
+      }
+      toast.success("You're in. (Demo account)");
+      router.replace(redirectTo);
+      router.refresh();
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   }
 
   async function handleGoogle() {
-    start(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${location.origin}/auth/callback?next=${redirectTo}`,
+          redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
-      if (error) toast.error(error.message);
-    });
+      if (error) toast.error(formatAuthError(error.message));
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   }
 
   return (
@@ -96,11 +169,22 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
       <Button
         type="button"
+        size="lg"
+        className="w-full"
+        disabled={busy}
+        onClick={() => void handleDemo()}
+      >
+        <Zap className="h-4 w-4" />
+        Skip — try a demo account
+      </Button>
+
+      <Button
+        type="button"
         variant="outline"
         size="lg"
         className="w-full"
-        disabled={pending}
-        onClick={handleGoogle}
+        disabled={busy}
+        onClick={() => void handleGoogle()}
       >
         <GoogleIcon />
         Continue with Google
@@ -113,7 +197,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         </span>
       </div>
 
-      <form onSubmit={handleEmailPassword} className="space-y-4">
+      <form onSubmit={(e) => void handleEmailPassword(e)} className="space-y-4">
         {mode === "signup" && (
           <div className="space-y-1.5">
             <Label htmlFor="fullName">Full name</Label>
@@ -169,8 +253,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
             />
           </div>
         </div>
-        <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? (
+        <Button type="submit" size="lg" className="w-full" disabled={busy}>
+          {busy ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : mode === "login" ? (
             <LogIn className="h-4 w-4" />
@@ -186,8 +270,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         variant="ghost"
         size="sm"
         className="w-full"
-        disabled={pending || magicSent}
-        onClick={handleMagicLink}
+        disabled={busy || magicSent}
+        onClick={() => void handleMagicLink()}
       >
         {magicSent ? "Magic link sent" : "Email me a magic link instead"}
       </Button>
@@ -207,6 +291,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
       </p>
     </div>
   );
+}
+
+function formatAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (
+    m.includes("rate limit") ||
+    m.includes("too many requests") ||
+    m.includes("over_email_send_rate_limit") ||
+    m.includes("over_request_rate") ||
+    m.includes("429")
+  ) {
+    return "Too many tries from this browser. Wait about a minute, then use one click (Continue with Google) or try again.";
+  }
+  return message;
 }
 
 function GoogleIcon() {
