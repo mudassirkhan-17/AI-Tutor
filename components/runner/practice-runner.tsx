@@ -22,9 +22,13 @@ import { cn, pct, timeAgo } from "@/lib/utils";
 import type { QuestionRow, ResultLabel } from "@/lib/supabase/types";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import type { QuestionOrigin } from "@/lib/mistakes/pick-questions";
+import { CoachChat, type CoachState } from "@/components/practice/coach-chat";
 
 type RunnerMode = "practice" | "mistakes";
 type SiblingDifficulty = "same" | "harder";
+
+/** Per-question shared budget (question + Socratic chat). Practice only. */
+const QUESTION_BUDGET_SEC = 120;
 
 type Props = {
   sessionId: string;
@@ -56,6 +60,14 @@ type Slot = {
   hintLoading: boolean;
   hintUsed: boolean;
 
+  // socratic coach (practice only)
+  coachState: CoachState;
+  coached: boolean;
+  /** Wall-clock deadline for this question's shared 2-min budget (ms). */
+  deadline: number | null;
+  /** Set true once the timer expires so the slot can't be re-armed. */
+  timedOut: boolean;
+
   // sibling
   sibling: QuestionRow | null;
   siblingSource: "ai" | "bank" | null;
@@ -75,6 +87,10 @@ function slotFor(q: QuestionRow): Slot {
     hint: null,
     hintLoading: false,
     hintUsed: false,
+    coachState: "choosing",
+    coached: false,
+    deadline: null,
+    timedOut: false,
     sibling: null,
     siblingSource: null,
     siblingSelected: null,
@@ -119,9 +135,12 @@ export function PracticeRunner({
   );
   const [index, setIndex] = React.useState(0);
   const [finishing, setFinishing] = React.useState(false);
+  // 1Hz tick; only used in Practice mode to drive the per-question timer.
+  const [now, setNow] = React.useState(() => Date.now());
   const { open: openChat } = useChatSheet();
 
   const slot = slots[index];
+  const coachEnabled = mode === "practice";
 
   const patchSlot = React.useCallback(
     (patch: Partial<Slot>) =>
@@ -133,13 +152,35 @@ export function PracticeRunner({
     [index],
   );
 
+  /** Arm the deadline for the current slot the first time we land on it. */
+  React.useEffect(() => {
+    if (!coachEnabled) return;
+    if (!slot || slot.phase !== "ask") return;
+    if (slot.deadline != null) return;
+    patchSlot({ deadline: Date.now() + QUESTION_BUDGET_SEC * 1000 });
+  }, [coachEnabled, slot, patchSlot]);
+
+  /** 1Hz tick — only runs while a deadline is active and we're in "ask". */
+  React.useEffect(() => {
+    if (!coachEnabled) return;
+    if (!slot || slot.phase !== "ask" || slot.deadline == null) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [coachEnabled, slot?.phase, slot?.deadline]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const secondsLeft =
+    coachEnabled && slot?.deadline
+      ? Math.max(0, Math.ceil((slot.deadline - now) / 1000))
+      : QUESTION_BUDGET_SEC;
+
   async function recordPrimary(
     q: QuestionRow,
     startedAtMs: number,
-    answer: "A" | "B" | "C" | "D",
+    answer: "A" | "B" | "C" | "D" | null,
     isCorrect: boolean,
     label: ResultLabel | null,
     hinted: boolean,
+    coached: boolean,
   ): Promise<string | null> {
     try {
       const res = await fetch("/api/attempts", {
@@ -158,6 +199,7 @@ export function PracticeRunner({
           result_label: label,
           is_sibling: false,
           parent_attempt_id: null,
+          coached,
         }),
       });
       const json = await res.json();
@@ -281,50 +323,130 @@ export function PracticeRunner({
     }
   }
 
-  async function onPrimaryAnswer(letter: "A" | "B" | "C" | "D") {
-    if (!slot || slot.phase !== "ask") return;
-    const q = slot.primary;
-    const isCorrect = letter === q.correct_option;
+  const primaryCommittingRef = React.useRef(false);
 
-    if (isCorrect) {
+  async function commitPrimaryAnswer(
+    letter: "A" | "B" | "C" | "D",
+    s: Slot,
+  ) {
+    if (s.phase !== "ask") return;
+    if (primaryCommittingRef.current) return;
+    primaryCommittingRef.current = true;
+    const q = s.primary;
+    const isCorrect = letter === q.correct_option;
+    const coached = s.coached;
+
+    try {
+      if (isCorrect) {
+        patchSlot({
+          primarySelected: letter,
+          phase: "reveal",
+          label: "mastered",
+          coachState: "locked",
+        });
+        await recordPrimary(
+          q,
+          s.primaryStartedAt,
+          letter,
+          true,
+          "mastered",
+          s.hintUsed,
+          coached,
+        );
+        toast.success(coached ? "Locked in (coached)." : "Locked in.");
+        return;
+      }
+
       patchSlot({
         primarySelected: letter,
+        phase: "sibling-loading",
+        label: "hard_miss",
+        coachState: "locked",
+      });
+      const parentId = await recordPrimary(
+        q,
+        s.primaryStartedAt,
+        letter,
+        false,
+        "hard_miss",
+        s.hintUsed,
+        coached,
+      );
+      patchSlot({ primaryAttemptId: parentId });
+      if (!s.hint) {
+        fetchHint(q, letter);
+      }
+      await fetchSibling(q);
+    } finally {
+      primaryCommittingRef.current = false;
+    }
+  }
+
+  React.useEffect(() => {
+    primaryCommittingRef.current = false;
+  }, [index]);
+
+  function onPrimaryOptionTap(letter: "A" | "B" | "C" | "D") {
+    if (!slot || slot.phase !== "ask") return;
+    if (!coachEnabled) {
+      void commitPrimaryAnswer(letter, slot);
+      return;
+    }
+    patchSlot({
+      primarySelected: letter,
+      coachState: slot.coachState === "choosing" ? "closed" : slot.coachState,
+    });
+  }
+
+  function onPrimaryLockIn() {
+    const s = slots[index];
+    if (!s || s.phase !== "ask" || !s.primarySelected) return;
+    void commitPrimaryAnswer(s.primarySelected, s);
+  }
+
+  /**
+   * Time's up handler — when the shared 2:00 budget expires while we're
+   * still in "ask", commit whatever's selected (or null = hard_miss) and
+   * jump straight to the explanation. No sibling — they didn't earn it.
+   */
+  const expireTimeoutRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!coachEnabled) return;
+    if (!slot || slot.phase !== "ask") return;
+    if (secondsLeft > 0 || slot.timedOut) return;
+    if (expireTimeoutRef.current) return;
+    expireTimeoutRef.current = true;
+    (async () => {
+      const q = slot.primary;
+      const picked = slot.primarySelected;
+      const isCorrect = picked != null && picked === q.correct_option;
+      const label: ResultLabel = isCorrect ? "mastered" : "hard_miss";
+      patchSlot({
         phase: "reveal",
-        label: "mastered",
+        label,
+        timedOut: true,
+        coachState: "locked",
       });
       await recordPrimary(
         q,
         slot.primaryStartedAt,
-        letter,
-        true,
-        "mastered",
+        picked,
+        isCorrect,
+        label,
         slot.hintUsed,
+        slot.coached,
       );
-      toast.success("Locked in.");
-      return;
-    }
+      toast.error(
+        isCorrect
+          ? "Time! Counted what you had."
+          : "Time! Marked as needs review.",
+      );
+    })();
+  }, [coachEnabled, slot, secondsLeft, patchSlot]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Wrong: tentatively label as hard_miss; we'll upgrade to soft_miss if
-    // the sibling is right. Record attempt now so we have a parent id.
-    patchSlot({
-      primarySelected: letter,
-      phase: "sibling-loading",
-      label: "hard_miss",
-    });
-    const parentId = await recordPrimary(
-      q,
-      slot.primaryStartedAt,
-      letter,
-      false,
-      "hard_miss",
-      slot.hintUsed,
-    );
-    patchSlot({ primaryAttemptId: parentId });
-    if (!slot.hint) {
-      fetchHint(q, letter);
-    }
-    await fetchSibling(q);
-  }
+  React.useEffect(() => {
+    expireTimeoutRef.current = false;
+  }, [index]);
 
   async function onSiblingAnswer(letter: "A" | "B" | "C" | "D") {
     if (!slot || !slot.sibling || slot.phase !== "sibling-ask") return;
@@ -373,9 +495,11 @@ export function PracticeRunner({
       setIndex(index + 1);
       setSlots((prev) => {
         const n = [...prev];
+        // Reset start clock — deadline arms via the effect on first paint.
         n[index + 1] = {
           ...n[index + 1],
           primaryStartedAt: Date.now(),
+          deadline: null,
         };
         return n;
       });
@@ -449,6 +573,23 @@ export function PracticeRunner({
       </div>
       <Progress value={pct(index + (canAdvance ? 1 : 0), total)} />
 
+      {/* COACH CHAT — practice only, only during the "ask" phase. */}
+      {coachEnabled && slot.phase === "ask" && (
+        <CoachChat
+          questionId={slot.primary.id}
+          questionPrompt={slot.primary.prompt}
+          state={slot.coachState}
+          secondsLeft={secondsLeft}
+          totalSeconds={QUESTION_BUDGET_SEC}
+          onChooseTalk={() => patchSlot({ coachState: "open" })}
+          onLock={() => patchSlot({ coachState: "locked" })}
+          // `coached` flips to true the first time the student actually
+          // sends a message — opening the panel and immediately closing
+          // shouldn't taint the score.
+          onCoachUsed={() => patchSlot({ coached: true })}
+        />
+      )}
+
       {/* PRIMARY QUESTION CARD */}
       <QuestionPanel
         q={slot.primary}
@@ -462,7 +603,7 @@ export function PracticeRunner({
         hintLoading={slot.hintLoading}
         explanationRevealed={slot.phase !== "ask"}
         origin={questionOrigins?.[slot.primary.id]}
-        onAnswer={onPrimaryAnswer}
+        onAnswer={onPrimaryOptionTap}
         onAskAI={() =>
           openChat({
             id: slot.primary.id,
@@ -479,6 +620,17 @@ export function PracticeRunner({
           })
         }
       />
+
+      {coachEnabled && slot.phase === "ask" && slot.primarySelected && (
+        <div className="flex flex-col items-end gap-1 pt-1">
+          <Button size="default" onClick={onPrimaryLockIn}>
+            Lock in answer
+          </Button>
+          <span className="text-[11px] text-ink-muted">
+            Tap another letter above to change your pick first.
+          </span>
+        </div>
+      )}
 
       {/* SIBLING / LABEL PANEL */}
       {slot.phase === "sibling-loading" && (

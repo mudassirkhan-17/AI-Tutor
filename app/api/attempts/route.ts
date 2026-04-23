@@ -18,6 +18,7 @@ const Body = z.object({
     .optional(),
   is_sibling: z.boolean().optional().default(false),
   parent_attempt_id: z.string().uuid().nullable().optional(),
+  coached: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -33,16 +34,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { data: inserted, error } = await supabase
+  const payload: Record<string, unknown> = { user_id: user.id, ...parsed.data };
+
+  let { data: inserted, error } = await supabase
     .from("attempts")
-    .insert({
-      user_id: user.id,
-      ...parsed.data,
-    })
+    .insert(payload)
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Graceful fallback: if migration 0004 (attempts.coached) hasn't been applied
+  // yet, Postgres returns 42703 / "column ... does not exist". Drop the new
+  // column and retry so the app keeps working pre-migration.
+  if (
+    error &&
+    (error.code === "42703" || /column .*coached.* does not exist/i.test(error.message))
+  ) {
+    console.warn(
+      "[api/attempts] attempts.coached column missing — apply migration 0004_coached_attempts.sql. Retrying without coached.",
+    );
+    delete payload.coached;
+    const retry = await supabase
+      .from("attempts")
+      .insert(payload)
+      .select("id")
+      .single();
+    inserted = retry.data;
+    error = retry.error;
+  }
+
+  if (error) {
+    console.error("[api/attempts] insert failed", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, id: inserted?.id ?? null });
 }
 
