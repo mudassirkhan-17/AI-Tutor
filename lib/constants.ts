@@ -53,11 +53,15 @@ export const MODES = {
   final: {
     key: "final",
     label: "Final Test",
-    blurb: "Held-out questions. Your true readiness check.",
+    blurb:
+      "Mirrors the SC PSI exam exactly: 80 National + 40 State, two independent timers (120 + 60 min), pass each portion at 70%. Held-out questions, no adaptive bias.",
     questionCount: 120,
     timed: true,
-    durationMin: 240,
-    passPct: 75,
+    // Total wall time across both portions (excluding the optional break).
+    durationMin: 180,
+    // Per-portion pass — matches the real PSI report. Combined score is
+    // never used as a pass criterion.
+    passPct: 70,
     unlocksAfter: "mock",
   },
 } as const;

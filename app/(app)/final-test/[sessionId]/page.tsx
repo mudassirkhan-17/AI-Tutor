@@ -1,6 +1,6 @@
-import { QuestionRunner } from "@/components/runner/question-runner";
+import { FinalExamRunner } from "@/components/final/final-exam-runner";
 import { loadSessionAndQuestions } from "@/lib/runner/loader";
-import { MODES } from "@/lib/constants";
+import type { QuestionRow } from "@/lib/supabase/types";
 
 export default async function FinalTestRunner({
   params,
@@ -9,16 +9,39 @@ export default async function FinalTestRunner({
 }) {
   const { sessionId } = await params;
   const { session, questions } = await loadSessionAndQuestions(sessionId);
-  const startedAt = new Date(session.started_at).getTime();
+
+  const cfg = (session.config ?? {}) as {
+    national_question_ids?: string[];
+    state_question_ids?: string[];
+    portion?: "both" | "national" | "state";
+  };
+
+  const byId = new Map<string, QuestionRow>(questions.map((q) => [q.id, q]));
+  const nationalQuestions: QuestionRow[] = (cfg.national_question_ids ?? [])
+    .map((id) => byId.get(id))
+    .filter(Boolean) as QuestionRow[];
+  const stateQuestions: QuestionRow[] = (cfg.state_question_ids ?? [])
+    .map((id) => byId.get(id))
+    .filter(Boolean) as QuestionRow[];
+
+  const initialPhase: "national" | "state" =
+    cfg.portion === "state"
+      ? "state"
+      : cfg.portion === "national"
+        ? "national"
+        : nationalQuestions.length > 0
+          ? "national"
+          : "state";
+
+  const startedAtMs = new Date(session.started_at).getTime();
 
   return (
-    <QuestionRunner
+    <FinalExamRunner
       sessionId={sessionId}
-      mode="final"
-      questions={questions}
-      timed={{ durationMin: MODES.final.durationMin }}
-      startedAt={startedAt}
-      behavior="exam"
+      nationalQuestions={nationalQuestions}
+      stateQuestions={stateQuestions}
+      nationalStartedAtMs={startedAtMs}
+      initialPhase={initialPhase}
       resultsPath={`/final-test/${sessionId}/results`}
     />
   );

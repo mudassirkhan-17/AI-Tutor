@@ -1,63 +1,98 @@
 import { NextResponse } from "next/server";
-import {
-  startSession,
-  getQuestionsForMode,
-  attachQuestionsToSession,
-} from "@/lib/runner/session";
+import { z } from "zod";
+import { startSession } from "@/lib/runner/session";
 import { createClient } from "@/lib/supabase/server";
-import { MODES } from "@/lib/constants";
+import { getFinalGateStatus } from "@/lib/final/completion";
+import {
+  pickFinalQuestions,
+  FINAL_NATIONAL_DURATION_MIN,
+  FINAL_STATE_DURATION_MIN,
+  FINAL_PASS_PCT,
+  type Portion,
+} from "@/lib/final/pick-questions";
 
-export async function POST() {
+const Body = z
+  .object({
+    portion: z.enum(["both", "national", "state"]).optional().default("both"),
+  })
+  .optional()
+  .default({ portion: "both" });
+
+export async function POST(req: Request) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
 
-  const { data: lastMock } = await supabase
-    .from("sessions")
-    .select("score_pct")
-    .eq("user_id", user.id)
-    .eq("mode", "mock")
-    .eq("status", "finished")
-    .order("finished_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const json = await req.json().catch(() => ({}));
+  const parsed = Body.safeParse(json);
+  let portion: "both" | Portion = parsed.success ? parsed.data.portion : "both";
 
-  if (Number(lastMock?.score_pct ?? 0) < 70) {
+  // Gate check + partial-retake enforcement.
+  const gate = await getFinalGateStatus(supabase, user.id);
+  // Cooldown is always enforced.
+  if (gate.details.cooldownDaysRemaining > 0) {
     return NextResponse.json(
-      { error: "Final Test unlocks after a Mock Exam score of 70% or higher." },
+      {
+        error: `Cooldown active: wait ${gate.details.cooldownDaysRemaining} more day(s) before retaking.`,
+      },
+      { status: 403 },
+    );
+  }
+  // Partial-retake mode forces the missing portion regardless of request.
+  if (gate.partialRetake?.active) {
+    portion = gate.partialRetake.needPortion;
+  } else if (!gate.unlocked) {
+    return NextResponse.json(
+      { error: gate.reasons[0] ?? "Final Test is locked." },
       { status: 403 },
     );
   }
 
-  let qs = await getQuestionsForMode("final", {
-    count: MODES.final.questionCount,
-    pool: "final_holdout",
-  });
-  // Fallback: if no held-out pool exists yet, use the standard pool so the
-  // Final Test is still runnable.
-  if (qs.length < 20) {
-    qs = await getQuestionsForMode("final", {
-      count: MODES.final.questionCount,
-      pool: "standard",
-    });
-  }
-  if (qs.length < 20) {
+  const pick = await pickFinalQuestions(supabase, user.id, { portion });
+
+  const all = [...pick.nationalQuestions, ...pick.stateQuestions];
+  if (all.length === 0) {
     return NextResponse.json(
-      { error: "Not enough questions in the bank to run the Final Test." },
+      {
+        error:
+          "Held-out pool is exhausted for this user — no unseen questions left for the requested portion.",
+      },
       { status: 400 },
     );
   }
 
+  // Per-portion durations; informational total in config.
+  const nationalDuration =
+    pick.nationalQuestions.length > 0 ? FINAL_NATIONAL_DURATION_MIN : 0;
+  const stateDuration =
+    pick.stateQuestions.length > 0 ? FINAL_STATE_DURATION_MIN : 0;
+
   const { sessionId } = await startSession({
     mode: "final",
     config: {
-      question_ids: qs.map((q) => q.id),
-      durationMin: MODES.final.durationMin,
-      passPct: MODES.final.passPct,
+      // Persist national first, state second — runner uses portions
+      // independently but loader uses this order for review listing.
+      question_ids: all.map((q) => q.id),
+      national_question_ids: pick.nationalQuestions.map((q) => q.id),
+      state_question_ids: pick.stateQuestions.map((q) => q.id),
+      portion,
+      passPct: FINAL_PASS_PCT,
+      national_duration_min: nationalDuration,
+      state_duration_min: stateDuration,
+      durationMin: nationalDuration + stateDuration,
+      composition: pick.composition,
     },
   });
-  await attachQuestionsToSession(sessionId, qs.map((q) => q.id));
-  return NextResponse.json({ sessionId, runnerPath: `/final-test/${sessionId}` });
+
+  return NextResponse.json({
+    sessionId,
+    runnerPath: `/final-test/${sessionId}`,
+    portion,
+    nationalCount: pick.nationalQuestions.length,
+    stateCount: pick.stateQuestions.length,
+  });
 }
