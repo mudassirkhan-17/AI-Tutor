@@ -26,11 +26,21 @@ type Section = {
   count: number;
 };
 
+type SectionFreshness = {
+  code: string;
+  lastAssessedAt: string | null;
+  daysSinceAssessed: number | null;
+  fresh: boolean;
+};
+
 type Coverage = {
   covered: string[];
   missing: string[];
   allCovered: boolean;
   nextSection: string | null;
+  stale?: string[];
+  freshness?: SectionFreshness[];
+  freshnessDays?: number;
 };
 
 type Length = "quick" | "deep" | "smoke";
@@ -67,6 +77,16 @@ export function AssessmentPicker({
     () => new Set(coverage?.covered ?? []),
     [coverage?.covered],
   );
+  const staleSet = React.useMemo(
+    () => new Set(coverage?.stale ?? []),
+    [coverage?.stale],
+  );
+  const freshnessByCode = React.useMemo(() => {
+    const m = new Map<string, SectionFreshness>();
+    for (const f of coverage?.freshness ?? []) m.set(f.code, f);
+    return m;
+  }, [coverage?.freshness]);
+  const freshnessDays = coverage?.freshnessDays ?? 7;
 
   const eligible = sections.filter((s) => s.count > 0);
   const allSelected = picked.size === eligible.length;
@@ -159,7 +179,7 @@ export function AssessmentPicker({
                     Practice unlocks at 12/12 sections
                   </span>
                   <span className="text-ink-muted">
-                    · {coveredCount}/{totalSections} done
+                    · {coveredCount}/{totalSections} fresh
                   </span>
                 </div>
                 {coverage.nextSection && (
@@ -174,6 +194,14 @@ export function AssessmentPicker({
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
+              {(staleSet.size > 0 || (coverage.freshness?.length ?? 0) > 0) && (
+                <div className="mt-3 text-[11px] text-ink-muted">
+                  Coverage decays after {freshnessDays} days — re-assess to
+                  refresh.{staleSet.size > 0
+                    ? ` ${staleSet.size} section${staleSet.size === 1 ? "" : "s"} stale.`
+                    : ""}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -235,6 +263,8 @@ export function AssessmentPicker({
               const disabled = s.count === 0;
               const active = picked.has(s.code);
               const done = coveredSet.has(s.code);
+              const stale = staleSet.has(s.code);
+              const fr = freshnessByCode.get(s.code);
               return (
                 <button
                   key={s.code}
@@ -265,7 +295,20 @@ export function AssessmentPicker({
                     </div>
                     <div className="text-xs text-ink-muted">
                       {s.group} · {s.count.toLocaleString()} questions
-                      {done && (
+                      {done && fr?.daysSinceAssessed != null && (
+                        <span className="ml-1 text-success">
+                          · fresh
+                          {fr.daysSinceAssessed === 0
+                            ? " · today"
+                            : ` · ${fr.daysSinceAssessed}d ago`}
+                        </span>
+                      )}
+                      {!done && stale && fr?.daysSinceAssessed != null && (
+                        <span className="ml-1 text-warn">
+                          · stale · {fr.daysSinceAssessed}d ago
+                        </span>
+                      )}
+                      {done && fr?.daysSinceAssessed == null && (
                         <span className="ml-1 text-success">· assessed</span>
                       )}
                     </div>

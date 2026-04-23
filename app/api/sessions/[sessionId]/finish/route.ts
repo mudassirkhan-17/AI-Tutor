@@ -43,7 +43,7 @@ export async function POST(
     const { data: attempts } = await supabase
       .from("attempts")
       .select(
-        "question_id, attempt_number, is_correct, result_label, question:questions(id, section_code, concept_id, level)",
+        "question_id, attempt_number, is_correct, result_label, time_spent_ms, question:questions(id, section_code, concept_id, level)",
       )
       .eq("session_id", sessionId)
       .eq("user_id", user.id)

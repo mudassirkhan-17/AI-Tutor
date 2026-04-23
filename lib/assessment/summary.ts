@@ -9,6 +9,7 @@ export type RawAttempt = {
   user_answer: "A" | "B" | "C" | "D" | null;
   hinted: boolean;
   retried: boolean;
+  time_spent_ms?: number | null;
   question: QuestionRow;
 };
 
@@ -17,6 +18,7 @@ type AttemptLite = {
   attempt_number: number;
   is_correct: boolean;
   result_label: ResultLabel | null;
+  time_spent_ms?: number | null;
   question: {
     id: string;
     section_code: string;
@@ -32,6 +34,10 @@ export type SectionStat = {
   soft_miss: number;
   hard_miss: number;
   accuracy: number; // mastered / total
+  /** Sum of time_spent_ms across all attempts (incl. 2nd tries) for this section. */
+  total_time_ms: number;
+  /** total_time_ms / total (rounded). */
+  avg_time_ms: number;
 };
 
 export type ConceptStat = {
@@ -44,6 +50,22 @@ export type ConceptStat = {
   accuracy: number;
 };
 
+/**
+ * Predicted real-exam pass probability, derived from a one-sided normal
+ * approximation of the binomial. Honest signal: only meaningful when the
+ * sample is at least ~10 questions per portion. We expose `signal` so the
+ * UI can warn when the estimate is weak.
+ */
+export type PortionPrediction = {
+  total: number;
+  mastered: number;
+  accuracy_pct: number;
+  /** Probability of clearing the SC pass line (70%) on a real-length portion. */
+  pass_probability: number;
+  /** Bucketed signal strength so the UI can label this as low/medium/strong. */
+  signal: "low" | "medium" | "strong";
+};
+
 export type AssessmentSummary = {
   total: number;
   mastered: number;
@@ -54,6 +76,17 @@ export type AssessmentSummary = {
   sections: SectionStat[];
   weakest_concepts: ConceptStat[]; // top 5 by hard_miss desc, then soft_miss
   strongest_concepts: ConceptStat[]; // top 3 by mastered desc
+  /** Sum of time_spent_ms across every recorded attempt. */
+  total_time_ms: number;
+  /** Average time per question (ms). */
+  avg_time_ms: number;
+  /** Predicted real-exam pass probability, per portion + combined. */
+  predicted: {
+    national: PortionPrediction;
+    state: PortionPrediction;
+    /** P(pass national) * P(pass state). */
+    combined_probability: number;
+  };
 };
 
 /** Back-compat: older rows may still hold "lucky"; we count it as mastered. */
@@ -64,12 +97,85 @@ function normalizeLabel(
   return (label as ResultLabel | null) ?? null;
 }
 
+/* ---------------- Pass probability math ---------------- */
+
+const PASS_LINE = 0.7;
+/**
+ * Real-exam portion sizes (we use these as the n for the predicted
+ * probability, regardless of the assessment length the student picked).
+ */
+const PORTION_REAL_SIZE: Record<"national" | "state", number> = {
+  national: 80,
+  state: 40,
+};
+
+/** Φ(z) — standard normal CDF (Abramowitz & Stegun 7.1.26 approx). */
+function normalCdf(z: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p =
+    d *
+    t *
+    (0.3193815 +
+      t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return z > 0 ? 1 - p : p;
+}
+
+/**
+ * P(observed accuracy from a length-n exam at this true rate ≥ 70%).
+ * Normal approximation to the binomial. Defensive on tiny n.
+ */
+function portionPassProb(observedPct: number, observedN: number): number {
+  if (observedN <= 0) return 0;
+  const p = Math.max(0.001, Math.min(0.999, observedPct / 100));
+  const n = PORTION_REAL_SIZE.national; // we use the real exam length below
+  // Use real exam length so the variance is realistic, not the diagnostic length.
+  return 1 - normalCdf((PASS_LINE - p) / Math.sqrt((p * (1 - p)) / n));
+}
+
+function signalStrength(n: number): PortionPrediction["signal"] {
+  if (n >= 25) return "strong";
+  if (n >= 10) return "medium";
+  return "low";
+}
+
+function buildPortionPrediction(
+  sections: SectionStat[],
+  prefix: "A" | "B",
+): PortionPrediction {
+  const portion = sections.filter((s) => s.code.startsWith(prefix));
+  const total = portion.reduce((a, b) => a + b.total, 0);
+  const mastered = portion.reduce((a, b) => a + b.mastered, 0);
+  const accuracy_pct = total ? Math.round((100 * mastered) / total) : 0;
+  return {
+    total,
+    mastered,
+    accuracy_pct,
+    pass_probability: portionPassProb(accuracy_pct, total),
+    signal: signalStrength(total),
+  };
+}
+
 /**
  * Build a summary from raw attempts. We use the FIRST attempt per
  * question to derive the result_label (for quick re-derivation on the
  * results page if needed).
  */
 export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
+  // Total time aggregates across BOTH tries (1 + 2) so per-question time
+  // reflects how long the student spent on the question end to end.
+  const timeByQ = new Map<string, number>();
+  for (const a of attempts) {
+    if (typeof a.time_spent_ms !== "number" || a.time_spent_ms < 0) continue;
+    timeByQ.set(
+      a.question_id,
+      (timeByQ.get(a.question_id) ?? 0) + a.time_spent_ms,
+    );
+  }
+
+  // Final outcome per question = first attempt that has a result_label
+  // (which is set on the LAST attempt for that question — first try if
+  // mastered, second try otherwise).
   const byQ = new Map<string, AttemptLite>();
   for (const a of attempts) {
     const label = normalizeLabel(a.result_label as ResultLabel | "lucky" | null);
@@ -88,6 +194,7 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
   for (const r of rows) {
     const sec = r.question.section_code;
     const cid = r.question.concept_id;
+    const tMs = timeByQ.get(r.question_id) ?? 0;
 
     const ss = sectionMap.get(sec) ?? {
       code: sec,
@@ -96,8 +203,11 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
       soft_miss: 0,
       hard_miss: 0,
       accuracy: 0,
+      total_time_ms: 0,
+      avg_time_ms: 0,
     };
     ss.total += 1;
+    ss.total_time_ms += tMs;
 
     if (cid) {
       const cs = conceptMap.get(cid) ?? {
@@ -128,6 +238,7 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
       hard++;
     }
     ss.accuracy = ss.total ? Math.round((ss.mastered / ss.total) * 100) : 0;
+    ss.avg_time_ms = ss.total ? Math.round(ss.total_time_ms / ss.total) : 0;
     sectionMap.set(sec, ss);
   }
 
@@ -154,6 +265,11 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
     .sort((a, b) => b.accuracy - a.accuracy || b.mastered - a.mastered)
     .slice(0, 3);
 
+  const total_time_ms = sections.reduce((a, s) => a + s.total_time_ms, 0);
+
+  const national = buildPortionPrediction(sections, "A");
+  const state = buildPortionPrediction(sections, "B");
+
   return {
     total,
     mastered,
@@ -166,5 +282,12 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
     sections,
     weakest_concepts,
     strongest_concepts,
+    total_time_ms,
+    avg_time_ms: total ? Math.round(total_time_ms / total) : 0,
+    predicted: {
+      national,
+      state,
+      combined_probability: national.pass_probability * state.pass_probability,
+    },
   };
 }

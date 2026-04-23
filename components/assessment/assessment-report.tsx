@@ -19,6 +19,10 @@ import {
   Flag,
   Target,
   Gauge,
+  Clock,
+  Hourglass,
+  Trophy,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -226,6 +230,9 @@ export function AssessmentReport({
         />
       </section>
 
+      {/* PREDICTED PASS PROBABILITY */}
+      <PassProbabilityPanel summary={summary} />
+
       {/* TUTOR LETTER */}
       {tutorLetter && (
         <TutorLetter
@@ -239,6 +246,23 @@ export function AssessmentReport({
 
       {/* SECTION BREAKDOWN */}
       <SectionBreakdown summary={summary} sectionTitles={sectionTitles} />
+
+      {/* TIME + SECTION RADAR */}
+      <div className="grid lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-3">
+          <TimeInsightPanel
+            summary={summary}
+            durationMs={durationMs}
+            sectionTitles={sectionTitles}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <SectionRadarCard
+            summary={summary}
+            sectionTitles={sectionTitles}
+          />
+        </div>
+      </div>
 
       {/* PRIORITIES */}
       <div className="grid lg:grid-cols-2 gap-4">
@@ -799,6 +823,454 @@ function Bar({
   if (!total || !n) return null;
   const w = Math.max(2, (n / total) * 100);
   return <div className={cn("h-full", color)} style={{ width: `${w}%` }} />;
+}
+
+/* ---------------- Predicted pass probability ---------------- */
+
+function PassProbabilityPanel({ summary }: { summary: AssessmentSummary }) {
+  const p = summary.predicted;
+  const combinedPct = Math.round(p.combined_probability * 100);
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold">If you sat the real exam today</h3>
+          </div>
+          <span className="text-xs text-ink-muted">
+            Modeled from your accuracy. Honest math, not a promise.
+          </span>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <PortionProbCard
+            label="National (80 Q · 70%)"
+            portion={p.national}
+          />
+          <PortionProbCard
+            label="South Carolina (40 Q · 70%)"
+            portion={p.state}
+          />
+          <CombinedProbCard
+            pct={combinedPct}
+            note={
+              p.national.signal === "low" || p.state.signal === "low"
+                ? "Low signal — finish more sections to firm this up."
+                : "Probability you clear BOTH portions on the same sitting."
+            }
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PortionProbCard({
+  label,
+  portion,
+}: {
+  label: string;
+  portion: AssessmentSummary["predicted"]["national"];
+}) {
+  const pct = Math.round(portion.pass_probability * 100);
+  const tone =
+    pct >= 75 ? "success" : pct >= 50 ? "warn-strong" : "danger";
+  const t = TONES[tone];
+  const sigLabel =
+    portion.signal === "strong"
+      ? "Strong signal"
+      : portion.signal === "medium"
+        ? "Medium signal"
+        : "Low signal";
+  return (
+    <div className={cn("rounded-2xl border p-4", t.ring, t.bg)}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-ink">{label}</span>
+        <Badge variant="outline" className="text-[10px] tabular-nums">
+          {sigLabel}
+        </Badge>
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className={cn("font-serif text-4xl font-semibold tabular-nums", t.text)}>
+          {pct}
+          <span className="text-xl text-ink-muted">%</span>
+        </span>
+        <span className="text-xs text-ink-muted">pass probability</span>
+      </div>
+      <div className="mt-2 text-xs text-ink-muted">
+        Based on {portion.mastered}/{portion.total} first-try ·{" "}
+        <span className="text-ink font-medium">{portion.accuracy_pct}%</span>
+      </div>
+      <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn("h-full", t.soft)}
+          style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CombinedProbCard({ pct, note }: { pct: number; note: string }) {
+  const tone =
+    pct >= 60 ? "success" : pct >= 30 ? "warn-strong" : "danger";
+  const t = TONES[tone];
+  return (
+    <div className={cn("rounded-2xl border p-4", t.ring, "bg-surface")}>
+      <div className="flex items-center gap-2">
+        <Sparkles className={cn("h-4 w-4", t.text)} />
+        <span className="text-xs font-medium text-ink">
+          Both portions combined
+        </span>
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className={cn("font-serif text-4xl font-semibold tabular-nums", t.text)}>
+          {pct}
+          <span className="text-xl text-ink-muted">%</span>
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-ink-muted leading-snug">{note}</p>
+    </div>
+  );
+}
+
+/* ---------------- Time insight ---------------- */
+
+function formatSecs(ms: number): string {
+  if (!ms || ms < 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m}m ${r}s` : `${m}m`;
+}
+
+function TimeInsightPanel({
+  summary,
+  durationMs,
+  sectionTitles,
+}: {
+  summary: AssessmentSummary;
+  durationMs: number;
+  sectionTitles: Record<string, string>;
+}) {
+  const sections = summary.sections;
+  const totalQ = summary.total || 1;
+  const overallAvg = summary.avg_time_ms || 0;
+  const maxAvg = sections.reduce(
+    (m, s) => Math.max(m, s.avg_time_ms || 0),
+    0,
+  );
+
+  // Find the slowest and fastest section to call out at top.
+  const sorted = [...sections]
+    .filter((s) => s.total > 0)
+    .sort((a, b) => (b.avg_time_ms || 0) - (a.avg_time_ms || 0));
+  const slowest = sorted[0];
+  const fastest = sorted[sorted.length - 1];
+
+  return (
+    <Card className="h-full">
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold">Time on task</h3>
+          </div>
+          <span className="text-xs text-ink-muted">
+            Where seconds went, and where you stalled.
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          <TimeKpi
+            icon={Hourglass}
+            label="Total time"
+            value={formatMs(durationMs || summary.total_time_ms)}
+          />
+          <TimeKpi
+            icon={Activity}
+            label="Avg / question"
+            value={formatSecs(overallAvg)}
+          />
+          <TimeKpi
+            icon={Clock}
+            label="On the clock"
+            value={
+              totalQ
+                ? `${formatSecs(summary.total_time_ms)} / ${totalQ}Q`
+                : "—"
+            }
+          />
+        </div>
+
+        {slowest && fastest && slowest.code !== fastest.code && (
+          <div className="mb-4 rounded-xl border border-border bg-elevated/40 p-3 text-xs text-ink-muted">
+            Slowest:{" "}
+            <span className="text-ink font-medium">
+              {slowest.code} · {sectionTitles[slowest.code] ?? ""}
+            </span>{" "}
+            at {formatSecs(slowest.avg_time_ms)}/Q. Fastest:{" "}
+            <span className="text-ink font-medium">
+              {fastest.code} · {sectionTitles[fastest.code] ?? ""}
+            </span>{" "}
+            at {formatSecs(fastest.avg_time_ms)}/Q.
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {sections.map((s) => (
+            <TimeRow
+              key={s.code}
+              row={s}
+              maxAvg={maxAvg}
+              title={sectionTitles[s.code] ?? ""}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimeKpi({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-3">
+      <div className="flex items-center gap-2 text-xs text-ink-muted">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </div>
+      <div className="mt-1 font-serif text-2xl font-semibold tabular-nums text-ink leading-none">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function TimeRow({
+  row,
+  maxAvg,
+  title,
+}: {
+  row: SectionStat;
+  maxAvg: number;
+  title: string;
+}) {
+  // Lollipop bar: width = relative time, dot color = accuracy bucket.
+  const width = maxAvg > 0 ? (row.avg_time_ms / maxAvg) * 100 : 0;
+  const acc = row.accuracy;
+  const dotTone =
+    acc >= 80
+      ? "bg-success"
+      : acc >= 60
+        ? "bg-primary"
+        : acc >= 40
+          ? "bg-warn"
+          : "bg-danger";
+  return (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+      <div className="flex items-center gap-2 min-w-0 w-[10rem]">
+        <Badge variant="outline" className="shrink-0">
+          {row.code}
+        </Badge>
+        <span className="text-xs text-ink-muted truncate">{title}</span>
+      </div>
+      <div className="relative h-3 rounded-full bg-muted overflow-visible">
+        <div
+          className="h-full rounded-full bg-ink/15"
+          style={{ width: `${Math.max(2, width)}%` }}
+        />
+        <div
+          className={cn(
+            "absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full border-2 border-surface shadow-soft",
+            dotTone,
+          )}
+          style={{
+            left: `calc(${Math.max(2, width)}% - 7px)`,
+          }}
+          aria-hidden
+        />
+      </div>
+      <div className="text-xs tabular-nums text-ink-muted w-[5.5rem] text-right">
+        <span className="text-ink font-medium">
+          {formatSecs(row.avg_time_ms)}
+        </span>{" "}
+        · {acc}%
+      </div>
+    </div>
+  );
+}
+
+type SectionStat = AssessmentSummary["sections"][number];
+
+/* ---------------- Section radar ---------------- */
+
+function SectionRadarCard({
+  summary,
+  sectionTitles,
+}: {
+  summary: AssessmentSummary;
+  sectionTitles: Record<string, string>;
+}) {
+  const sections = summary.sections.filter((s) => s.total > 0);
+  return (
+    <Card className="h-full">
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold">Mastery radar</h3>
+          </div>
+          <span className="text-xs text-ink-muted">First-try accuracy</span>
+        </div>
+        {sections.length < 3 ? (
+          <div className="text-sm text-ink-muted py-6 text-center">
+            Assess at least 3 sections to see the radar.
+          </div>
+        ) : (
+          <SectionRadarSvg
+            rows={sections}
+            sectionTitles={sectionTitles}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SectionRadarSvg({
+  rows,
+  sectionTitles,
+}: {
+  rows: SectionStat[];
+  sectionTitles: Record<string, string>;
+}) {
+  void sectionTitles;
+  const size = 280;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 26;
+  const n = rows.length;
+  const angleFor = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+
+  // Background rings at 25/50/75/100.
+  const rings = [0.25, 0.5, 0.75, 1];
+
+  // Polygon points for the data.
+  const points = rows.map((s, i) => {
+    const ang = angleFor(i);
+    const v = Math.max(0, Math.min(1, s.accuracy / 100));
+    return [cx + Math.cos(ang) * r * v, cy + Math.sin(ang) * r * v];
+  });
+  const polyData = points.map((p) => p.join(",")).join(" ");
+
+  // Pass-line ring at 70%.
+  const passV = 0.7;
+
+  return (
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="w-full h-auto block"
+        role="img"
+        aria-label="Section mastery radar"
+      >
+        {/* Background rings */}
+        {rings.map((v, i) => (
+          <circle
+            key={i}
+            cx={cx}
+            cy={cy}
+            r={r * v}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={0.08}
+            className="text-ink"
+          />
+        ))}
+        {/* Pass-line ring */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r * passV}
+          fill="none"
+          strokeDasharray="3 4"
+          stroke="currentColor"
+          strokeOpacity={0.45}
+          className="text-primary"
+        />
+        {/* Spokes */}
+        {rows.map((_, i) => {
+          const ang = angleFor(i);
+          return (
+            <line
+              key={i}
+              x1={cx}
+              y1={cy}
+              x2={cx + Math.cos(ang) * r}
+              y2={cy + Math.sin(ang) * r}
+              stroke="currentColor"
+              strokeOpacity={0.08}
+              className="text-ink"
+            />
+          );
+        })}
+        {/* Data polygon */}
+        <polygon
+          points={polyData}
+          className="fill-primary/25 stroke-primary"
+          strokeWidth={1.5}
+        />
+        {/* Data points */}
+        {points.map((p, i) => (
+          <circle
+            key={i}
+            cx={p[0]}
+            cy={p[1]}
+            r={3}
+            className="fill-primary"
+          />
+        ))}
+        {/* Axis labels */}
+        {rows.map((s, i) => {
+          const ang = angleFor(i);
+          const lr = r + 14;
+          const lx = cx + Math.cos(ang) * lr;
+          const ly = cy + Math.sin(ang) * lr;
+          return (
+            <text
+              key={s.code}
+              x={lx}
+              y={ly}
+              className="fill-ink-muted"
+              fontSize={10}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {s.code}
+            </text>
+          );
+        })}
+      </svg>
+      <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-ink-muted justify-center">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-primary" />
+          Your accuracy
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-px w-4 border-t border-dashed border-primary" />
+          70% pass line
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /* ---------------- Concept rows ---------------- */

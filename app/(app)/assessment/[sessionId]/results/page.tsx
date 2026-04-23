@@ -32,13 +32,18 @@ export default async function AssessmentResults({
   const tutorLetter: string | null =
     (config.tutor_letter as string | undefined) ?? null;
 
-  // Fallback: rebuild summary on the fly if it wasn't stored (older session
-  // or finish call partially failed).
-  if (!summary) {
+  // Rebuild summary on the fly if it wasn't stored OR the cached one is from
+  // an older shape (missing the new time/predicted fields). This keeps old
+  // sessions visible without a migration.
+  if (
+    !summary ||
+    typeof summary.total_time_ms !== "number" ||
+    !summary.predicted
+  ) {
     const { data: attempts } = await supabase
       .from("attempts")
       .select(
-        "question_id, attempt_number, is_correct, result_label, question:questions(id, section_code, concept_id, level)",
+        "question_id, attempt_number, is_correct, result_label, time_spent_ms, question:questions(id, section_code, concept_id, level)",
       )
       .eq("session_id", sessionId)
       .eq("user_id", user.id)
@@ -66,7 +71,7 @@ export default async function AssessmentResults({
   const { data: rawAttempts } = await supabase
     .from("attempts")
     .select(
-      "question_id, attempt_number, is_correct, result_label, user_answer, hinted, retried, question:questions(*)",
+      "question_id, attempt_number, is_correct, result_label, user_answer, hinted, retried, time_spent_ms, question:questions(*)",
     )
     .eq("session_id", sessionId)
     .eq("user_id", user.id)
