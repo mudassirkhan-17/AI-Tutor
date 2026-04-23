@@ -285,7 +285,7 @@ export function DebriefPanel({ snapshot, initialPlan, initialCommitted }: Props)
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-surface to-surface shadow-soft"
+      className="relative flex h-[min(92dvh,900px)] max-h-[94dvh] min-h-0 flex-col overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-surface to-surface shadow-soft"
     >
       {/* Ambient glow */}
       <div
@@ -298,7 +298,7 @@ export function DebriefPanel({ snapshot, initialPlan, initialCommitted }: Props)
       />
 
       {/* Header */}
-      <div className="relative flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4 sm:px-6">
+      <div className="relative flex shrink-0 items-start justify-between gap-4 border-b border-border/60 px-5 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-primary/40 blur-md animate-pulse" />
@@ -328,15 +328,15 @@ export function DebriefPanel({ snapshot, initialPlan, initialCommitted }: Props)
         </button>
       </div>
 
-      {/* Body — split: chat + plan */}
-      <div className="relative grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-0">
+      {/* Body — split: chat + plan (bounded height so composer + CTAs stay in view) */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[1.15fr_1fr] lg:gap-0">
         {/* Chat column */}
-        <div className="flex min-h-[420px] flex-col border-b border-border/60 lg:border-b-0 lg:border-r">
+        <div className="flex min-h-0 flex-[1.15] basis-0 flex-col border-b border-border/60 lg:h-full lg:max-h-full lg:flex-none lg:border-b-0 lg:border-r">
           <ChatStream
             messages={messages as unknown as Array<{ id: string; role: string; parts?: MessagePart[]; content?: string }>}
             isLoading={isLoading}
           />
-          <div className="border-t border-border/60 px-5 py-3 sm:px-6">
+          <div className="shrink-0 border-t border-border/60 bg-surface/90 px-5 py-3 backdrop-blur-sm sm:px-6">
             <div className="mb-2 flex flex-wrap gap-1.5">
               {suggestions.map((s) => (
                 <button
@@ -382,24 +382,26 @@ export function DebriefPanel({ snapshot, initialPlan, initialCommitted }: Props)
           </div>
         </div>
 
-        {/* Plan column */}
-        <div className="flex flex-col bg-surface/40 p-5 sm:p-6">
-          <PlanHeader
-            plan={plan}
-            committed={committed}
-            onReset={resetPlan}
-          />
-          <PlanTotalControl total={plan.total ?? 30} onChange={setTotal} />
-          <PlanDifficulty bias={plan.difficultyBias ?? "mix"} onChange={setBias} />
-          <PlanSections
-            focusSet={focusSet}
-            avoidSet={avoidSet}
-            weakest={snapshot.weakestCodes}
-            onToggleFocus={toggleFocus}
-            onToggleAvoid={toggleAvoid}
-          />
-          <PlanPreview preview={preview} total={plan.total ?? 30} />
-          <div className="mt-auto pt-5">
+        {/* Plan column — scroll controls; CTAs pinned at bottom */}
+        <div className="flex min-h-0 flex-1 basis-0 flex-col overflow-hidden bg-surface/40 lg:h-full lg:flex-none">
+          <div className="thin-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6 sm:py-5">
+            <PlanHeader
+              plan={plan}
+              committed={committed}
+              onReset={resetPlan}
+            />
+            <PlanTotalControl total={plan.total ?? 30} onChange={setTotal} />
+            <PlanDifficulty bias={plan.difficultyBias ?? "mix"} onChange={setBias} />
+            <PlanSections
+              focusSet={focusSet}
+              avoidSet={avoidSet}
+              weakest={snapshot.weakestCodes}
+              onToggleFocus={toggleFocus}
+              onToggleAvoid={toggleAvoid}
+            />
+            <PlanPreview preview={preview} total={plan.total ?? 30} />
+          </div>
+          <div className="shrink-0 border-t border-border/60 bg-surface/95 px-5 py-4 backdrop-blur-sm sm:px-6">
             <AnimatePresence mode="wait">
               {committed ? (
                 <motion.div
@@ -557,7 +559,7 @@ function ChatStream({
   return (
     <div
       ref={scrollerRef}
-      className="flex-1 overflow-y-auto thin-scroll px-5 py-4 sm:px-6 space-y-3"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain thin-scroll px-5 py-4 sm:px-6 space-y-3"
     >
       {messages.length === 0 && (
         <div className="text-sm text-ink-muted">
