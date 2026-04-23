@@ -393,7 +393,7 @@ export async function pickMockQuestions(
 
   // Build composition summary for UI + session config.
   const countBySection = new Map<string, number>();
-  let difficultyCounts = { easy: 0, medium: 0, hard: 0 };
+  const difficultyCounts = { easy: 0, medium: 0, hard: 0 };
   for (const q of finalList) {
     countBySection.set(
       q.section_code,

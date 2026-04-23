@@ -40,7 +40,7 @@ export function QuestionCard({
   question,
   index,
   total,
-  mode,
+  mode: _mode,
   behavior,
   hintRevealed,
   flagged,

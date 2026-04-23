@@ -62,9 +62,6 @@ type Props = {
   initialCommitted?: boolean;
 };
 
-const SECTION_TITLE: Record<string, string> = Object.fromEntries(
-  SECTIONS.map((s) => [s.code, s.title]),
-);
 const SECTION_GROUP: Record<string, "National" | "State"> = Object.fromEntries(
   SECTIONS.map((s) => [s.code, s.group as "National" | "State"]),
 );

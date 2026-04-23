@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Trophy,
   Clock,
-  Lock,
   AlertTriangle,
   Calendar,
   ShieldCheck,

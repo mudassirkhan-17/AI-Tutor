@@ -272,7 +272,7 @@ export async function pickMistakesQuestions(
     (s) => s.code,
   );
 
-  let nationalCount = Math.round(remaining * NATIONAL_SHARE);
+  const nationalCount = Math.round(remaining * NATIONAL_SHARE);
   let stateCount = remaining - nationalCount;
   if (nationalCount + stateCount !== remaining) {
     stateCount = remaining - nationalCount;

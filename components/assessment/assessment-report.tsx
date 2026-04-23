@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Lightbulb,
   Lock,
   TrendingUp,
   BookOpen,

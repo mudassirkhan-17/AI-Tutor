@@ -15,7 +15,6 @@ export const PRACTICE_TOTAL = 110;
 /** Smoke-test length for verifying flows without grinding 110 questions. */
 export const PRACTICE_SMOKE_TOTAL = 10;
 const NATIONAL_SHARE = 80 / 120;
-const STATE_SHARE = 40 / 120;
 
 type MasteryRow = {
   section_code: string;
@@ -90,7 +89,6 @@ export function allocateSectionCounts(
 ): Map<SectionCode, number> {
   const alpha = opts.alpha ?? 1.75;
   const minPer = opts.minPer;
-  const n = sections.length;
   const counts = new Map<SectionCode, number>();
   for (const s of sections) counts.set(s, 0);
 
@@ -237,7 +235,7 @@ async function pickForSection(
     mp = mp + 0.05;
     hp = Math.max(0.1, hp - 0.15);
   }
-  let { easy, medium, hard } = splitCounts(count, ep, mp, hp);
+  const { easy, medium, hard } = splitCounts(count, ep, mp, hp);
 
   const picked: QuestionRow[] = [];
   const seen = new Set<string>();
@@ -283,7 +281,7 @@ export async function pickPracticeQuestions(
   const plan = planInput ? sanitizePlan(planInput) : null;
   const target = Math.max(1, Math.floor(total));
 
-  let nationalTarget = Math.round(target * NATIONAL_SHARE);
+  const nationalTarget = Math.round(target * NATIONAL_SHARE);
   let stateTarget = target - nationalTarget;
   if (nationalTarget + stateTarget !== target) {
     stateTarget = target - nationalTarget;

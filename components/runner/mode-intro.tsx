@@ -46,7 +46,7 @@ export function ModeIntro({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [extraConfig, setExtraConfig] = useState<Record<string, unknown>>({});
+  const [extraConfig] = useState<Record<string, unknown>>({});
   const Icon = ICONS[mode];
 
   async function begin() {

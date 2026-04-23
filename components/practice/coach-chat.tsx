@@ -550,7 +550,7 @@ function CoachConversation({
               <>
                 <Sparkles className="h-3 w-3" />
                 {remainingTurns} turn{remainingTurns === 1 ? "" : "s"} left ·
-                I'll never tell you the letter.
+                I&apos;ll never tell you the letter.
               </>
             )}
           </div>
