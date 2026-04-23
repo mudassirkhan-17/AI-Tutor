@@ -1,5 +1,13 @@
-import { ResultsView } from "@/components/runner/results-view";
-import { loadSessionAttempts } from "@/lib/runner/loader";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { SECTIONS } from "@/lib/constants";
+import { MistakesResultsView } from "@/components/mistakes/mistakes-results";
+import {
+  buildMistakesStats,
+  type MistakesAttempt,
+} from "@/lib/mistakes/results";
+import { generateMistakesNote } from "@/lib/mistakes/results-note";
+import { loadJourney } from "@/lib/journey/load";
 
 export default async function MistakesResults({
   params,
@@ -7,22 +15,63 @@ export default async function MistakesResults({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
-  const { session, attempts } = await loadSessionAttempts(sessionId);
-  const summary = attempts.map((a) => ({
-    question: a.question,
-    user_answer: a.user_answer,
-    is_correct: a.is_correct,
-  }));
-  const correct = summary.filter((a) => a.is_correct).length;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("id, started_at, finished_at, score_pct, duration_ms, config, mode")
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .single();
+  if (!session) redirect("/dashboard");
+
+  const { data: rawAttempts } = await supabase
+    .from("attempts")
+    .select(
+      "question_id, attempt_number, is_correct, user_answer, hinted, retried, time_spent_ms, created_at, question:questions(*)",
+    )
+    .eq("session_id", sessionId)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
+  const attempts = (rawAttempts ?? []) as unknown as MistakesAttempt[];
+  const stats = buildMistakesStats(attempts);
+
+  const journey = await loadJourney(supabase, user.id);
+
+  const sectionTitles = Object.fromEntries(
+    SECTIONS.map((s) => [s.code, s.title]),
+  );
+
+  // Cache the AI note in `sessions.config.mistakes_note` so it doesn't
+  // re-generate on every refresh.
+  const cfg = (session.config ?? {}) as Record<string, unknown>;
+  let aiNote = (cfg.mistakes_note as string | undefined) ?? "";
+  if (!aiNote || aiNote.length < 30) {
+    aiNote = await generateMistakesNote(stats, journey, sectionTitles);
+    try {
+      await supabase
+        .from("sessions")
+        .update({ config: { ...cfg, mistakes_note: aiNote } })
+        .eq("id", sessionId)
+        .eq("user_id", user.id);
+    } catch (e) {
+      console.warn("[mistakes/results] failed to cache mistakes_note", e);
+    }
+  }
+
   return (
-    <ResultsView
-      mode="mistakes"
-      score={Math.round(Number(session.score_pct ?? 0))}
-      total={summary.length}
-      correct={correct}
+    <MistakesResultsView
+      sessionId={sessionId}
       durationMs={session.duration_ms ?? 0}
-      attempts={summary}
-      primaryRetryHref="/mistakes"
+      stats={stats}
+      journey={journey}
+      sectionTitles={sectionTitles}
+      aiNote={aiNote}
     />
   );
 }

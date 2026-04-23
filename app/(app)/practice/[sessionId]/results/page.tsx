@@ -8,6 +8,7 @@ import {
 } from "@/lib/practice/results";
 import { loadPracticeBaseline } from "@/lib/practice/baseline";
 import { generatePracticeNote } from "@/lib/practice/results-note";
+import { loadJourney } from "@/lib/journey/load";
 
 export default async function PracticeResults({
   params,
@@ -46,6 +47,7 @@ export default async function PracticeResults({
   const stats = buildPracticeStats(attempts);
 
   const baseline = await loadPracticeBaseline(supabase, user.id, sessionId);
+  const journey = await loadJourney(supabase, user.id);
 
   const sectionTitles = Object.fromEntries(
     SECTIONS.map((s) => [s.code, s.title]),
@@ -77,6 +79,7 @@ export default async function PracticeResults({
       baseline={baseline}
       sectionTitles={sectionTitles}
       aiNote={aiNote}
+      journey={journey}
     />
   );
 }

@@ -1,7 +1,12 @@
+import { redirect } from "next/navigation";
 import { MockReport, type MockAttempt } from "@/components/mock/mock-report";
 import { loadSessionAttempts } from "@/lib/runner/loader";
 import { buildMockReport } from "@/lib/mock/report";
 import { MOCK_PASS_PCT } from "@/lib/mock/pick-questions";
+import { generateMockNote } from "@/lib/mock/results-note";
+import { loadJourney } from "@/lib/journey/load";
+import { createClient } from "@/lib/supabase/server";
+import { SECTIONS } from "@/lib/constants";
 import type { QuestionRow } from "@/lib/supabase/types";
 
 type StoredComposition = Parameters<typeof buildMockReport>[0]["composition"];
@@ -58,6 +63,49 @@ export default async function MockExamResults({
     passPct,
   });
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const journey = await loadJourney(supabase, user.id);
+  const sectionTitles = Object.fromEntries(
+    SECTIONS.map((s) => [s.code, s.title]),
+  );
+
+  // Cache the AI note in `sessions.config.mock_note` so it doesn't
+  // re-generate on every refresh.
+  const cfgMut = (session.config ?? {}) as Record<string, unknown>;
+  let aiNote = (cfgMut.mock_note as string | undefined) ?? "";
+  if (!aiNote || aiNote.length < 30) {
+    aiNote = await generateMockNote({
+      score: scorePct,
+      passPct,
+      total,
+      correct,
+      nationalCorrect: report.nationalCorrect,
+      nationalTotal: report.nationalTotal,
+      stateCorrect: report.stateCorrect,
+      stateTotal: report.stateTotal,
+      sections: report.sections,
+      difficulty: report.difficulty,
+      verdict: report.verdict,
+      calibration: report.calibration,
+      journey,
+      sectionTitles,
+    });
+    try {
+      await supabase
+        .from("sessions")
+        .update({ config: { ...cfgMut, mock_note: aiNote } })
+        .eq("id", sessionId)
+        .eq("user_id", user.id);
+    } catch (e) {
+      console.warn("[mock/results] failed to cache mock_note", e);
+    }
+  }
+
   return (
     <MockReport
       sessionId={sessionId}
@@ -76,6 +124,8 @@ export default async function MockExamResults({
       verdict={report.verdict}
       calibration={report.calibration}
       attempts={normalizedAttempts}
+      journey={journey}
+      aiNote={aiNote}
     />
   );
 }

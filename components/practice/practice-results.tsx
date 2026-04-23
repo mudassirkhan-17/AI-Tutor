@@ -31,6 +31,8 @@ import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import type { PracticeStats, PracticeReviewItem } from "@/lib/practice/results";
 import type { PracticeBaseline } from "@/lib/practice/baseline";
+import type { Journey } from "@/lib/journey/load";
+import { JourneyPanel } from "@/components/results/journey-panel";
 
 type Props = {
   sessionId: string;
@@ -39,6 +41,7 @@ type Props = {
   baseline: PracticeBaseline;
   sectionTitles: Record<string, string>;
   aiNote: string;
+  journey?: Journey;
 };
 
 /* =====================================================================
@@ -64,13 +67,14 @@ export function PracticeResultsView({
   baseline,
   sectionTitles,
   aiNote,
+  journey,
 }: Props) {
-  void sessionId;
   return (
     <div className="space-y-6">
       <Hero stats={stats} durationMs={durationMs} />
       <KpiGrid stats={stats} />
       <AINotePanel note={aiNote} />
+      {journey && <JourneyPanel journey={journey} currentSessionId={sessionId} />}
       <ComparisonPanel
         stats={stats}
         baseline={baseline}

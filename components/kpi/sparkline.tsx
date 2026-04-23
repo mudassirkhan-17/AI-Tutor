@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 export function Sparkline({
   values,
   height = 36,
@@ -9,6 +11,7 @@ export function Sparkline({
   height?: number;
   className?: string;
 }) {
+  const gradId = React.useId().replace(/:/g, "");
   if (!values.length) return null;
   const w = 100;
   const h = height;
@@ -27,12 +30,12 @@ export function Sparkline({
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className={`w-full ${className}`} preserveAspectRatio="none">
       <defs>
-        <linearGradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1">
+        <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
           <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={area} fill="url(#sparkGrad)" />
+      <path d={area} fill={`url(#${gradId})`} />
       <path
         d={path}
         fill="none"

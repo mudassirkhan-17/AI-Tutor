@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   RotateCcw,
   ChevronDown,
@@ -17,6 +18,9 @@ import {
   Compass,
   AlertTriangle,
   Trophy,
+  Target,
+  Timer,
+  Flame,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +28,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import type { QuestionRow } from "@/lib/supabase/types";
+import type { Journey } from "@/lib/journey/load";
+import { JourneyPanel } from "@/components/results/journey-panel";
 
 /* ------------------------------- types ---------------------------------- */
 
@@ -84,6 +90,8 @@ type Props = {
   verdict: Verdict;
   calibration: Calibration;
   attempts: MockAttempt[];
+  journey: Journey;
+  aiNote: string;
 };
 
 /* ------------------------------- helpers -------------------------------- */
@@ -103,7 +111,7 @@ function pctRound(correct: number, total: number) {
 /* ------------------------------- component ------------------------------- */
 
 export function MockReport({
-  sessionId: _sessionId,
+  sessionId,
   score,
   total,
   correct,
@@ -119,8 +127,22 @@ export function MockReport({
   verdict,
   calibration,
   attempts,
+  journey,
+  aiNote,
 }: Props) {
   const passed = score >= passPct;
+  const overshoot = score - passPct;
+  const totalAnswered = total;
+  const avgPerQuestionMs = totalAnswered ? Math.round(durationMs / totalAnswered) : 0;
+  const easyP = pctRound(difficulty.easy.correct, difficulty.easy.total);
+  const medP = pctRound(difficulty.medium.correct, difficulty.medium.total);
+  const hardP = pctRound(difficulty.hard.correct, difficulty.hard.total);
+  const weakSections = sections
+    .filter((s) => s.total >= 2 && s.accuracyPct < passPct)
+    .sort((a, b) => a.accuracyPct - b.accuracyPct);
+  const recoverPoints = weakSections
+    .slice(0, 3)
+    .reduce((acc, s) => acc + s.recoverPoints, 0);
 
   return (
     <div className="space-y-6">
@@ -167,6 +189,30 @@ export function MockReport({
 
       {/* -------- Honest verdict -------- */}
       <VerdictCard verdict={verdict} passPct={passPct} />
+
+      {/* -------- KPI grid -------- */}
+      <KpiGrid
+        score={score}
+        passed={passed}
+        overshoot={overshoot}
+        nationalCorrect={nationalCorrect}
+        nationalTotal={nationalTotal}
+        stateCorrect={stateCorrect}
+        stateTotal={stateTotal}
+        easyP={easyP}
+        medP={medP}
+        hardP={hardP}
+        avgPerQuestionMs={avgPerQuestionMs}
+        weakCount={weakSections.length}
+        recoverPoints={recoverPoints}
+        passPct={passPct}
+      />
+
+      {/* -------- AI coach note -------- */}
+      {aiNote && <AINotePanel note={aiNote} />}
+
+      {/* -------- Cross-mode journey -------- */}
+      <JourneyPanel journey={journey} currentSessionId={sessionId} />
 
       {/* -------- National / State sub-scores -------- */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -630,6 +676,180 @@ function CalibrationCard({ calibration }: { calibration: Calibration }) {
           <h3 className="font-semibold">Model calibration</h3>
         </div>
         <p className="text-sm text-ink-muted">{summary}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------------ KPI grid -------------------------------- */
+
+function KpiGrid(props: {
+  score: number;
+  passed: boolean;
+  overshoot: number;
+  nationalCorrect: number;
+  nationalTotal: number;
+  stateCorrect: number;
+  stateTotal: number;
+  easyP: number;
+  medP: number;
+  hardP: number;
+  avgPerQuestionMs: number;
+  weakCount: number;
+  recoverPoints: number;
+  passPct: number;
+}) {
+  const {
+    score,
+    passed,
+    overshoot,
+    nationalCorrect,
+    nationalTotal,
+    stateCorrect,
+    stateTotal,
+    hardP,
+    avgPerQuestionMs,
+    weakCount,
+    recoverPoints,
+  } = props;
+
+  const nationalP = pctRound(nationalCorrect, nationalTotal);
+  const stateP = pctRound(stateCorrect, stateTotal);
+  const subscoreSpread = Math.abs(nationalP - stateP);
+
+  const tiles: KpiTileProps[] = [
+    {
+      icon: Target,
+      tone: passed ? "success" : "danger",
+      label: passed ? "Margin over bar" : "Gap to bar",
+      value: `${passed ? "+" : ""}${overshoot}`,
+      sub: passed
+        ? `${score}% with the bar at ${props.passPct}%`
+        : `${Math.abs(overshoot)} pts under the line`,
+    },
+    {
+      icon: Compass,
+      tone: subscoreSpread <= 5 ? "success" : subscoreSpread <= 12 ? "warn" : "danger",
+      label: "Sub-score balance",
+      value: `${subscoreSpread}pt`,
+      sub:
+        nationalP >= stateP
+          ? `Nat ${nationalP}% · SC ${stateP}%`
+          : `SC ${stateP}% · Nat ${nationalP}%`,
+    },
+    {
+      icon: Flame,
+      tone: hardP >= 60 ? "success" : hardP >= 45 ? "warn" : "danger",
+      label: "Hard-question pulse",
+      value: `${hardP}%`,
+      sub: `Easy and medium tracked separately below`,
+    },
+    {
+      icon: Timer,
+      tone: avgPerQuestionMs <= 60_000 ? "success" : avgPerQuestionMs <= 90_000 ? "warn" : "danger",
+      label: "Avg per question",
+      value: avgPerQuestionMs ? formatMs(avgPerQuestionMs) : "—",
+      sub: `Real exam allows ~72 sec/Q`,
+    },
+    {
+      icon: AlertTriangle,
+      tone: weakCount === 0 ? "success" : weakCount <= 2 ? "warn" : "danger",
+      label: "Sections below bar",
+      value: weakCount,
+      sub:
+        weakCount === 0
+          ? `Every section cleared the bar`
+          : `Lifting top ${Math.min(weakCount, 3)} would add ~${recoverPoints} pts`,
+    },
+  ];
+
+  return (
+    <section className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {tiles.map((t, i) => (
+        <KpiTile key={t.label} {...t} index={i} />
+      ))}
+    </section>
+  );
+}
+
+type KpiTileProps = {
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "success" | "warn" | "danger" | "primary";
+  label: string;
+  value: number | string;
+  sub: string;
+  index?: number;
+};
+
+function KpiTile({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  sub,
+  index = 0,
+}: KpiTileProps) {
+  const toneCls =
+    tone === "success"
+      ? "text-success bg-success/10 border-success/20"
+      : tone === "warn"
+        ? "text-warn bg-warn/10 border-warn/20"
+        : tone === "danger"
+          ? "text-danger bg-danger/10 border-danger/20"
+          : "text-primary bg-primary/10 border-primary/20";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 * index, duration: 0.3 }}
+    >
+      <Card className="h-full">
+        <CardContent className="p-4 flex flex-col gap-2">
+          <div
+            className={cn(
+              "h-9 w-9 grid place-items-center rounded-xl border",
+              toneCls,
+            )}
+          >
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="font-serif text-3xl font-semibold tabular-nums text-ink leading-none">
+            {value}
+          </div>
+          <div className="text-xs uppercase tracking-widest text-ink-muted">
+            {label}
+          </div>
+          <div className="text-[11px] text-ink-muted leading-snug">{sub}</div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+/* ------------------------------- AI note -------------------------------- */
+
+function AINotePanel({ note }: { note: string }) {
+  return (
+    <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-br from-primary-soft/40 via-surface to-surface">
+      <div
+        className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/15 blur-3xl pointer-events-none"
+        aria-hidden
+      />
+      <CardContent className="relative pt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="h-8 w-8 rounded-xl bg-primary text-primary-foreground grid place-items-center shadow-soft">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="font-semibold text-ink">Coach&apos;s note</h3>
+            <p className="text-[11px] text-ink-muted">
+              Personal read on this mock — drawn from your full journey.
+            </p>
+          </div>
+        </div>
+        <div className="text-sm text-ink leading-relaxed whitespace-pre-line">
+          {note}
+        </div>
       </CardContent>
     </Card>
   );

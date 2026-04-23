@@ -10,6 +10,14 @@ export type SectionMastery = {
   accuracy: number; // 0-100
 };
 
+export type ModeSessionTotals = {
+  assessment: number;
+  practice: number;
+  mistakes: number;
+  mock: number;
+  final: number;
+};
+
 export type UserStats = {
   totalAttempts: number;
   totalCorrect: number;
@@ -32,7 +40,29 @@ export type UserStats = {
   topStrengths: SectionMastery[];
   topWeaknesses: SectionMastery[];
   unresolvedMistakes: number;
+  /** Weighted accuracy across National (A1–A6) sections with attempts. */
+  nationalAccuracy: number;
+  /** Weighted accuracy across State (B1–B6) sections with attempts. */
+  stateAccuracy: number;
+  /** Finished sessions in the last 30 days (any mode). */
+  finishedSessionsLast30: number;
+  /** Sum of `duration_ms` for finished sessions in the last 30 days. */
+  studyMsLast30: number;
+  /** Days in the last 30 with at least one attempt (from daily rollup). */
+  activeDaysLast30: number;
+  /** Count of finished sessions by mode (from recent sample, capped). */
+  modeTotals: ModeSessionTotals;
+  /** Highest finished mock score, or null. */
+  bestMockScore: number | null;
+  /** Most recent finished mock score, or null. */
+  lastMockScore: number | null;
+  /** Most recent finished practice session score, or null. */
+  lastPracticeScore: number | null;
 };
+
+function emptyModeTotals(): ModeSessionTotals {
+  return { assessment: 0, practice: 0, mistakes: 0, mock: 0, final: 0 };
+}
 
 export async function getUserStats(userId: string): Promise<UserStats> {
   const supabase = await createClient();
@@ -45,6 +75,8 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     { data: allAttempts },
     { data: last7Attempts },
     { count: todayCount },
+    { data: finishedRecent },
+    { data: finishedModes },
   ] = await Promise.all([
     supabase.from("v_user_section_mastery").select("*").eq("user_id", userId),
     supabase
@@ -78,6 +110,20 @@ export async function getUserStats(userId: string): Promise<UserStats> {
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", new Date(new Date().toDateString()).toISOString()),
+    supabase
+      .from("sessions")
+      .select("mode, score_pct, finished_at, duration_ms, status")
+      .eq("user_id", userId)
+      .eq("status", "finished")
+      .not("finished_at", "is", null)
+      .order("finished_at", { ascending: false })
+      .limit(400),
+    supabase
+      .from("sessions")
+      .select("mode")
+      .eq("user_id", userId)
+      .eq("status", "finished")
+      .limit(2000),
   ]);
 
   const totalAttempts = allAttempts?.length ?? 0;
@@ -160,6 +206,65 @@ export async function getUserStats(userId: string): Promise<UserStats> {
       0.15 * coverageScore,
   );
 
+  const nat = mastery.filter((m) => m.group === "National");
+  const st = mastery.filter((m) => m.group === "State");
+  const natT = nat.reduce((a, m) => a + m.total, 0);
+  const natC = nat.reduce((a, m) => a + m.correct, 0);
+  const stT = st.reduce((a, m) => a + m.total, 0);
+  const stC = st.reduce((a, m) => a + m.correct, 0);
+  const nationalAccuracy = natT ? Math.round((100 * natC) / natT) : 0;
+  const stateAccuracy = stT ? Math.round((100 * stC) / stT) : 0;
+
+  const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const dailyRows = ((daily ?? []) as { day: string; attempts: number; correct: number }[]) || [];
+  let activeDaysLast30 = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const row = dailyRows.find((x) => x.day === key);
+    if (row && row.attempts > 0) activeDaysLast30++;
+  }
+
+  const finishedRows =
+    (finishedRecent ?? []) as Array<{
+      mode: string;
+      score_pct: number | null;
+      finished_at: string | null;
+      duration_ms: number | null;
+    }>;
+
+  const modeTotals = emptyModeTotals();
+  for (const row of (finishedModes ?? []) as { mode: string }[]) {
+    const m = row.mode as keyof ModeSessionTotals;
+    if (m in modeTotals) modeTotals[m] += 1;
+  }
+
+  let studyMsLast30 = 0;
+  let finishedSessionsLast30 = 0;
+  const mockScores: number[] = [];
+  let lastMockScore: number | null = null;
+  let lastPracticeScore: number | null = null;
+
+  for (const row of finishedRows) {
+    const finishedAt = row.finished_at ? new Date(row.finished_at) : null;
+    if (finishedAt && finishedAt >= cutoff30) {
+      finishedSessionsLast30++;
+      studyMsLast30 += row.duration_ms ?? 0;
+    }
+
+    if (row.mode === "mock" && row.score_pct != null) {
+      mockScores.push(Math.round(Number(row.score_pct)));
+      if (lastMockScore === null) lastMockScore = Math.round(Number(row.score_pct));
+    }
+    if (row.mode === "practice" && row.score_pct != null && lastPracticeScore === null) {
+      lastPracticeScore = Math.round(Number(row.score_pct));
+    }
+  }
+
+  const bestMockScore =
+    mockScores.length > 0 ? Math.max(...mockScores) : null;
+
   return {
     totalAttempts,
     totalCorrect,
@@ -170,10 +275,19 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     readinessScore,
     mastery,
     recentSessions: recent ?? [],
-    dailyActivity: ((daily ?? []) as { day: string; attempts: number; correct: number }[]) || [],
+    dailyActivity: dailyRows,
     sparkline,
     topStrengths,
     topWeaknesses,
     unresolvedMistakes: mistakesCount ?? 0,
+    nationalAccuracy,
+    stateAccuracy,
+    finishedSessionsLast30,
+    studyMsLast30,
+    activeDaysLast30,
+    modeTotals,
+    bestMockScore,
+    lastMockScore,
+    lastPracticeScore,
   };
 }
