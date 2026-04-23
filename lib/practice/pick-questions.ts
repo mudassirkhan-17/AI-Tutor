@@ -2,6 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SECTIONS, type SectionCode } from "@/lib/constants";
 import type { QuestionRow } from "@/lib/supabase/types";
 import { shuffle } from "@/lib/utils";
+import {
+  type DebriefPlan,
+  FOCUS_MULTIPLIER,
+  AVOID_MULTIPLIER,
+  FOCUS_FLOOR,
+  sanitizePlan,
+} from "@/lib/coach/debrief-plan";
 
 /** SC salesperson exam mix: 80 national + 40 state = 120 scored items. */
 export const PRACTICE_TOTAL = 110;
@@ -52,13 +59,15 @@ function weaknessWeight(
   section: string,
   mastery: Map<string, { total: number; accuracy: number }>,
   alpha: number,
+  multipliers?: Map<string, number>,
 ): number {
   const m = mastery.get(section);
-  if (!m || m.total === 0) {
-    return 0.92;
-  }
-  const acc = Math.min(100, Math.max(0, m.accuracy)) / 100;
-  return Math.pow(1 - acc + 0.04, alpha) + 0.08;
+  const base =
+    !m || m.total === 0
+      ? 0.92
+      : Math.pow(1 - Math.min(100, Math.max(0, m.accuracy)) / 100 + 0.04, alpha) + 0.08;
+  const mult = multipliers?.get(section) ?? 1;
+  return base * mult;
 }
 
 /**
@@ -70,7 +79,14 @@ export function allocateSectionCounts(
   pool: number,
   sections: readonly SectionCode[],
   mastery: Map<string, { total: number; accuracy: number }>,
-  opts: { minPer: number; alpha?: number },
+  opts: {
+    minPer: number;
+    alpha?: number;
+    /** Per-section weight multipliers (e.g. focus=2, avoid=0.4). */
+    multipliers?: Map<string, number>;
+    /** Section-specific floors (e.g. focus sections with ≥ N questions). */
+    floors?: Map<string, number>;
+  },
 ): Map<SectionCode, number> {
   const alpha = opts.alpha ?? 1.75;
   const minPer = opts.minPer;
@@ -80,14 +96,18 @@ export function allocateSectionCounts(
 
   if (pool <= 0) return counts;
 
-  const floorTotal = n * minPer;
+  const getFloor = (s: SectionCode) =>
+    Math.max(minPer, opts.floors?.get(s) ?? 0);
+
+  const floorTotal = sections.reduce((acc, s) => acc + getFloor(s), 0);
+
   if (pool < floorTotal) {
     let left = pool;
     while (left > 0) {
       let best: SectionCode = sections[0];
       let bestScore = -Infinity;
       for (const s of sections) {
-        const w = weaknessWeight(s, mastery, alpha);
+        const w = weaknessWeight(s, mastery, alpha, opts.multipliers);
         const c = counts.get(s) ?? 0;
         const score = w / (c + 1);
         if (score > bestScore) {
@@ -101,13 +121,13 @@ export function allocateSectionCounts(
     return counts;
   }
 
-  for (const s of sections) counts.set(s, minPer);
+  for (const s of sections) counts.set(s, getFloor(s));
   let left = pool - floorTotal;
   while (left > 0) {
     let best: SectionCode = sections[0];
     let bestScore = -Infinity;
     for (const s of sections) {
-      const w = weaknessWeight(s, mastery, alpha);
+      const w = weaknessWeight(s, mastery, alpha, opts.multipliers);
       const c = counts.get(s) ?? 0;
       const score = w / (c + 1);
       if (score > bestScore) {
@@ -201,12 +221,22 @@ async function pickForSection(
   section: SectionCode,
   count: number,
   mastery: Map<string, { total: number; accuracy: number }>,
+  difficultyBias?: DebriefPlan["difficultyBias"],
 ): Promise<QuestionRow[]> {
   if (count <= 0) return [];
   const m = mastery.get(section);
   const acc = m?.total ? m.accuracy : 55;
   const totalAtt = m?.total ?? 0;
-  const { easy: ep, medium: mp, hard: hp } = difficultyPercents(acc, totalAtt);
+  let { easy: ep, medium: mp, hard: hp } = difficultyPercents(acc, totalAtt);
+  if (difficultyBias === "harder") {
+    ep = Math.max(0.05, ep - 0.05);
+    mp = Math.max(0.1, mp - 0.05);
+    hp = hp + 0.1;
+  } else if (difficultyBias === "review") {
+    ep = ep + 0.1;
+    mp = mp + 0.05;
+    hp = Math.max(0.1, hp - 0.15);
+  }
   let { easy, medium, hard } = splitCounts(count, ep, mp, hp);
 
   const picked: QuestionRow[] = [];
@@ -248,7 +278,9 @@ export async function pickPracticeQuestions(
   supabase: SupabaseClient,
   userId: string,
   total: number = PRACTICE_TOTAL,
+  planInput?: DebriefPlan | null,
 ): Promise<QuestionRow[]> {
+  const plan = planInput ? sanitizePlan(planInput) : null;
   const target = Math.max(1, Math.floor(total));
 
   let nationalTarget = Math.round(target * NATIONAL_SHARE);
@@ -281,27 +313,40 @@ export async function pickPracticeQuestions(
   const nationalMin = target >= 60 ? 2 : 0;
   const stateMin = target >= 60 ? 1 : 0;
 
+  const multipliers = new Map<string, number>();
+  const floors = new Map<string, number>();
+  if (plan) {
+    for (const code of plan.focus ?? []) {
+      multipliers.set(code, FOCUS_MULTIPLIER);
+      if (target >= 15) floors.set(code, FOCUS_FLOOR);
+    }
+    for (const code of plan.avoid ?? []) {
+      if (!multipliers.has(code)) multipliers.set(code, AVOID_MULTIPLIER);
+    }
+  }
+
   const nationalCounts = allocateSectionCounts(
     nationalTarget,
     nationalCodes,
     mastery,
-    { minPer: nationalMin, alpha: 1.75 },
+    { minPer: nationalMin, alpha: 1.75, multipliers, floors },
   );
   const stateCounts = allocateSectionCounts(
     stateTarget,
     stateCodes,
     mastery,
-    { minPer: stateMin, alpha: 1.75 },
+    { minPer: stateMin, alpha: 1.75, multipliers, floors },
   );
 
+  const bias = plan?.difficultyBias;
   const out: QuestionRow[] = [];
   for (const code of nationalCodes) {
     const n = nationalCounts.get(code) ?? 0;
-    out.push(...(await pickForSection(supabase, code, n, mastery)));
+    out.push(...(await pickForSection(supabase, code, n, mastery, bias)));
   }
   for (const code of stateCodes) {
     const n = stateCounts.get(code) ?? 0;
-    out.push(...(await pickForSection(supabase, code, n, mastery)));
+    out.push(...(await pickForSection(supabase, code, n, mastery, bias)));
   }
 
   const shuffled = shuffle(out);

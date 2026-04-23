@@ -30,6 +30,9 @@ import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import type { QuestionRow } from "@/lib/supabase/types";
 import type { Journey } from "@/lib/journey/load";
 import { JourneyPanel } from "@/components/results/journey-panel";
+import { DebriefPanel } from "@/components/coach/debrief-panel";
+import type { DebriefPlan } from "@/lib/coach/debrief-plan";
+import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
 
 /* ------------------------------- types ---------------------------------- */
 
@@ -92,6 +95,8 @@ type Props = {
   attempts: MockAttempt[];
   journey: Journey;
   aiNote: string;
+  initialPlan?: DebriefPlan | null;
+  initialPlanCommitted?: boolean;
 };
 
 /* ------------------------------- helpers -------------------------------- */
@@ -129,6 +134,8 @@ export function MockReport({
   attempts,
   journey,
   aiNote,
+  initialPlan,
+  initialPlanCommitted,
 }: Props) {
   const passed = score >= passPct;
   const overshoot = score - passPct;
@@ -143,6 +150,37 @@ export function MockReport({
   const recoverPoints = weakSections
     .slice(0, 3)
     .reduce((acc, s) => acc + s.recoverPoints, 0);
+
+  const mockSnapshotSections = enrichSections(
+    sections.map((s) => ({
+      code: s.code,
+      title: s.title,
+      total: s.total,
+      correct: s.correct,
+      accuracy: s.accuracyPct,
+      baselineAccuracy: s.priorAccuracyPct,
+    })),
+  );
+  const { weakest: debriefWeak, strongest: debriefStrong } =
+    rankSections(mockSnapshotSections);
+  const debriefSnapshot = {
+    mode: "mock" as const,
+    sessionId,
+    total,
+    correct,
+    accuracy: score,
+    passBar: passPct,
+    durationMs,
+    hintUsed: null,
+    coachedPct: null,
+    bySection: mockSnapshotSections,
+    weakestCodes: debriefWeak,
+    strongestCodes: debriefStrong,
+    prior:
+      calibration.predicted != null
+        ? { label: "Predicted", accuracy: calibration.predicted }
+        : null,
+  };
 
   return (
     <div className="space-y-6">
@@ -186,6 +224,13 @@ export function MockReport({
           </div>
         </div>
       </section>
+
+      {/* -------- Coach debrief agent -------- */}
+      <DebriefPanel
+        snapshot={debriefSnapshot}
+        initialPlan={initialPlan}
+        initialCommitted={initialPlanCommitted}
+      />
 
       {/* -------- Honest verdict -------- */}
       <VerdictCard verdict={verdict} passPct={passPct} />

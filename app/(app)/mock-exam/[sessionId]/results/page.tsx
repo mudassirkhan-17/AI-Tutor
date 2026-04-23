@@ -8,6 +8,7 @@ import { loadJourney } from "@/lib/journey/load";
 import { createClient } from "@/lib/supabase/server";
 import { SECTIONS } from "@/lib/constants";
 import type { QuestionRow } from "@/lib/supabase/types";
+import { sanitizePlan, type DebriefPlan } from "@/lib/coach/debrief-plan";
 
 type StoredComposition = Parameters<typeof buildMockReport>[0]["composition"];
 
@@ -106,6 +107,11 @@ export default async function MockExamResults({
     }
   }
 
+  const storedPlan = cfgMut.debrief_plan
+    ? sanitizePlan(cfgMut.debrief_plan as Partial<DebriefPlan>)
+    : null;
+  const storedCommitted = Boolean(cfgMut.debrief_committed);
+
   return (
     <MockReport
       sessionId={sessionId}
@@ -126,6 +132,8 @@ export default async function MockExamResults({
       attempts={normalizedAttempts}
       journey={journey}
       aiNote={aiNote}
+      initialPlan={storedPlan}
+      initialPlanCommitted={storedCommitted}
     />
   );
 }

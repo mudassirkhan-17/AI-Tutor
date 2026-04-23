@@ -33,6 +33,9 @@ import type { PracticeStats, PracticeReviewItem } from "@/lib/practice/results";
 import type { PracticeBaseline } from "@/lib/practice/baseline";
 import type { Journey } from "@/lib/journey/load";
 import { JourneyPanel } from "@/components/results/journey-panel";
+import { DebriefPanel } from "@/components/coach/debrief-panel";
+import type { DebriefPlan } from "@/lib/coach/debrief-plan";
+import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
 
 type Props = {
   sessionId: string;
@@ -42,6 +45,8 @@ type Props = {
   sectionTitles: Record<string, string>;
   aiNote: string;
   journey?: Journey;
+  initialPlan?: DebriefPlan | null;
+  initialPlanCommitted?: boolean;
 };
 
 /* =====================================================================
@@ -68,10 +73,52 @@ export function PracticeResultsView({
   sectionTitles,
   aiNote,
   journey,
+  initialPlan,
+  initialPlanCommitted,
 }: Props) {
+  const sectionSnapshot = enrichSections(
+    stats.bySection.map((s) => {
+      const b = baseline.bySection?.[s.code];
+      return {
+        code: s.code,
+        title: sectionTitles[s.code],
+        total: s.total,
+        correct: s.correct,
+        accuracy: s.accuracy,
+        baselineAccuracy: b?.accuracy ?? null,
+      };
+    }),
+  );
+  const { weakest, strongest } = rankSections(sectionSnapshot);
+  const debriefSnapshot = {
+    mode: "practice" as const,
+    sessionId,
+    total: stats.total,
+    correct: stats.mastered + stats.soft,
+    accuracy: stats.reach_pct,
+    passBar: null,
+    durationMs,
+    hintUsed: stats.hint_count,
+    coachedPct: stats.coached_pct,
+    bySection: sectionSnapshot,
+    weakestCodes: weakest,
+    strongestCodes: strongest,
+    prior:
+      baseline.source === "assessment"
+        ? { label: "Assessment", accuracy: null }
+        : baseline.source === "lifetime"
+          ? { label: "Lifetime", accuracy: null }
+          : null,
+  };
+
   return (
     <div className="space-y-6">
       <Hero stats={stats} durationMs={durationMs} />
+      <DebriefPanel
+        snapshot={debriefSnapshot}
+        initialPlan={initialPlan}
+        initialCommitted={initialPlanCommitted}
+      />
       <KpiGrid stats={stats} />
       <AINotePanel note={aiNote} />
       {journey && <JourneyPanel journey={journey} currentSessionId={sessionId} />}

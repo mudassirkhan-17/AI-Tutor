@@ -8,10 +8,13 @@ import {
   PRACTICE_TOTAL,
   PRACTICE_SMOKE_TOTAL,
 } from "@/lib/practice/pick-questions";
+import { DebriefPlanSchema, sanitizePlan } from "@/lib/coach/debrief-plan";
 
 const Body = z
   .object({
-    length: z.enum(["full", "smoke"]).optional().default("full"),
+    length: z.enum(["full", "smoke", "custom"]).optional().default("full"),
+    plan: DebriefPlanSchema.optional(),
+    fromSessionId: z.string().uuid().optional(),
   })
   .optional()
   .default({ length: "full" });
@@ -42,9 +45,31 @@ export async function POST(req: Request) {
   const json = await req.json().catch(() => ({}));
   const parsed = Body.safeParse(json);
   const length = parsed.success ? parsed.data.length : "full";
-  const total = length === "smoke" ? PRACTICE_SMOKE_TOTAL : PRACTICE_TOTAL;
 
-  const qs = await pickPracticeQuestions(supabase, user.id, total);
+  // If a plan is provided, look up a plan-specified total; fallback otherwise.
+  let plan = parsed.success && parsed.data.plan ? sanitizePlan(parsed.data.plan) : null;
+
+  // Also try to pull a saved plan from the originating session (if the user
+  // accepted one via the debrief agent and came back later).
+  if (!plan && parsed.success && parsed.data.fromSessionId) {
+    const { data: src } = await supabase
+      .from("sessions")
+      .select("config")
+      .eq("id", parsed.data.fromSessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const stored = (src?.config as Record<string, unknown> | null)?.debrief_plan;
+    if (stored) plan = sanitizePlan(stored as Record<string, unknown>);
+  }
+
+  const total =
+    length === "custom" && plan?.total
+      ? plan.total
+      : length === "smoke"
+        ? PRACTICE_SMOKE_TOTAL
+        : PRACTICE_TOTAL;
+
+  const qs = await pickPracticeQuestions(supabase, user.id, total, plan);
   if (!qs.length) {
     return NextResponse.json(
       { error: "No questions available. Import your CSV first." },
@@ -58,6 +83,8 @@ export async function POST(req: Request) {
       question_ids: qs.map((q) => q.id),
       length,
       target_total: total,
+      debrief_plan_applied: plan ?? null,
+      from_session_id: parsed.success ? (parsed.data.fromSessionId ?? null) : null,
     },
   });
 
@@ -66,5 +93,6 @@ export async function POST(req: Request) {
     runnerPath: `/practice/${sessionId}`,
     length,
     total,
+    planApplied: !!plan,
   });
 }

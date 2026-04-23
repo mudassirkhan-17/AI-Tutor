@@ -8,6 +8,7 @@ import {
 } from "@/lib/mistakes/results";
 import { generateMistakesNote } from "@/lib/mistakes/results-note";
 import { loadJourney } from "@/lib/journey/load";
+import { sanitizePlan, type DebriefPlan } from "@/lib/coach/debrief-plan";
 
 export default async function MistakesResults({
   params,
@@ -64,6 +65,11 @@ export default async function MistakesResults({
     }
   }
 
+  const storedPlan = cfg.debrief_plan
+    ? sanitizePlan(cfg.debrief_plan as Partial<DebriefPlan>)
+    : null;
+  const storedCommitted = Boolean(cfg.debrief_committed);
+
   return (
     <MistakesResultsView
       sessionId={sessionId}
@@ -72,6 +78,8 @@ export default async function MistakesResults({
       journey={journey}
       sectionTitles={sectionTitles}
       aiNote={aiNote}
+      initialPlan={storedPlan}
+      initialPlanCommitted={storedCommitted}
     />
   );
 }

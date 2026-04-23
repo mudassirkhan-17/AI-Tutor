@@ -28,6 +28,9 @@ import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import type { MistakesStats, MistakesReviewItem } from "@/lib/mistakes/results";
 import type { Journey } from "@/lib/journey/load";
 import { JourneyPanel } from "@/components/results/journey-panel";
+import { DebriefPanel } from "@/components/coach/debrief-panel";
+import type { DebriefPlan } from "@/lib/coach/debrief-plan";
+import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
 
 type Props = {
   sessionId: string;
@@ -36,6 +39,8 @@ type Props = {
   journey: Journey;
   sectionTitles: Record<string, string>;
   aiNote: string;
+  initialPlan?: DebriefPlan | null;
+  initialPlanCommitted?: boolean;
 };
 
 /* =====================================================================
@@ -53,10 +58,44 @@ export function MistakesResultsView({
   journey,
   sectionTitles,
   aiNote,
+  initialPlan,
+  initialPlanCommitted,
 }: Props) {
+  const sectionSnapshot = enrichSections(
+    stats.bySection.map((s) => ({
+      code: s.code,
+      title: sectionTitles[s.code],
+      total: s.total,
+      correct: s.recovered,
+      accuracy: s.accuracy,
+      baselineAccuracy: null,
+    })),
+  );
+  const { weakest, strongest } = rankSections(sectionSnapshot);
+  const debriefSnapshot = {
+    mode: "mistakes" as const,
+    sessionId,
+    total: stats.total,
+    correct: stats.recovered,
+    accuracy: stats.accuracy_pct,
+    passBar: null,
+    durationMs,
+    hintUsed: stats.hint_count,
+    coachedPct: null,
+    bySection: sectionSnapshot,
+    weakestCodes: weakest,
+    strongestCodes: strongest,
+    prior: null,
+  };
+
   return (
     <div className="space-y-6">
       <Hero stats={stats} durationMs={durationMs} />
+      <DebriefPanel
+        snapshot={debriefSnapshot}
+        initialPlan={initialPlan}
+        initialCommitted={initialPlanCommitted}
+      />
       <KpiGrid stats={stats} />
       <AINotePanel note={aiNote} />
       <JourneyPanel journey={journey} currentSessionId={sessionId} />

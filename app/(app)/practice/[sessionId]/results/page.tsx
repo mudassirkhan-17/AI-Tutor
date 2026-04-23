@@ -9,6 +9,7 @@ import {
 import { loadPracticeBaseline } from "@/lib/practice/baseline";
 import { generatePracticeNote } from "@/lib/practice/results-note";
 import { loadJourney } from "@/lib/journey/load";
+import { sanitizePlan, type DebriefPlan } from "@/lib/coach/debrief-plan";
 
 export default async function PracticeResults({
   params,
@@ -71,6 +72,11 @@ export default async function PracticeResults({
     }
   }
 
+  const storedPlan = cfg.debrief_plan
+    ? sanitizePlan(cfg.debrief_plan as Partial<DebriefPlan>)
+    : null;
+  const storedCommitted = Boolean(cfg.debrief_committed);
+
   return (
     <PracticeResultsView
       sessionId={sessionId}
@@ -80,6 +86,8 @@ export default async function PracticeResults({
       sectionTitles={sectionTitles}
       aiNote={aiNote}
       journey={journey}
+      initialPlan={storedPlan}
+      initialPlanCommitted={storedCommitted}
     />
   );
 }
