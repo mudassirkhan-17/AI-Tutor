@@ -43,14 +43,18 @@ export async function POST(request: Request) {
     .single();
 
   // Graceful fallback: if migration 0004 (attempts.coached) hasn't been applied
-  // yet, Postgres returns 42703 / "column ... does not exist". Drop the new
-  // column and retry so the app keeps working pre-migration.
-  if (
-    error &&
-    (error.code === "42703" || /column .*coached.* does not exist/i.test(error.message))
-  ) {
+  // yet (or PostgREST's schema cache is stale), the insert fails. Postgres
+  // raises 42703 ("column ... does not exist"); PostgREST surfaces a stale
+  // cache as PGRST204 with a "Could not find the 'coached' column" message.
+  // Drop the new column and retry so the app keeps working pre-migration.
+  const isMissingCoached =
+    !!error &&
+    (error.code === "42703" ||
+      error.code === "PGRST204" ||
+      /coached/i.test(error.message ?? ""));
+  if (isMissingCoached) {
     console.warn(
-      "[api/attempts] attempts.coached column missing — apply migration 0004_coached_attempts.sql. Retrying without coached.",
+      "[api/attempts] attempts.coached column missing or schema cache stale — apply migration 0004_coached_attempts.sql (and reload PostgREST schema). Retrying without coached.",
     );
     delete payload.coached;
     const retry = await supabase

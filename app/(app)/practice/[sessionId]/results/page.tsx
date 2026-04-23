@@ -1,5 +1,13 @@
-import { ResultsView } from "@/components/runner/results-view";
-import { loadSessionAttempts } from "@/lib/runner/loader";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { SECTIONS } from "@/lib/constants";
+import { PracticeResultsView } from "@/components/practice/practice-results";
+import {
+  buildPracticeStats,
+  type PracticeAttempt,
+} from "@/lib/practice/results";
+import { loadPracticeBaseline } from "@/lib/practice/baseline";
+import { generatePracticeNote } from "@/lib/practice/results-note";
 
 export default async function PracticeResults({
   params,
@@ -7,25 +15,68 @@ export default async function PracticeResults({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
-  const { session, attempts } = await loadSessionAttempts(sessionId);
-  // For practice with retries, dedupe by question and use the last attempt's outcome
-  const dedup = new Map<string, (typeof attempts)[number]>();
-  for (const a of attempts) dedup.set(a.question_id, a);
-  const summary = Array.from(dedup.values()).map((a) => ({
-    question: a.question,
-    user_answer: a.user_answer,
-    is_correct: a.is_correct,
-  }));
-  const correct = summary.filter((a) => a.is_correct).length;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("id, started_at, finished_at, score_pct, duration_ms, config")
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .single();
+  if (!session) redirect("/dashboard");
+
+  // We select `*` for attempts so optional cols (`coached`, `is_sibling`,
+  // `parent_attempt_id`) come along when the migration is applied. They
+  // gracefully default to falsy when the columns don't exist (Supabase
+  // omits unknown columns from the select).
+  const { data: rawAttempts } = await supabase
+    .from("attempts")
+    .select(
+      "question_id, attempt_number, is_correct, result_label, user_answer, hinted, retried, coached, is_sibling, parent_attempt_id, time_spent_ms, created_at, question:questions(*)",
+    )
+    .eq("session_id", sessionId)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
+  const attempts = ((rawAttempts ?? []) as unknown) as PracticeAttempt[];
+  const stats = buildPracticeStats(attempts);
+
+  const baseline = await loadPracticeBaseline(supabase, user.id, sessionId);
+
+  const sectionTitles = Object.fromEntries(
+    SECTIONS.map((s) => [s.code, s.title]),
+  );
+
+  // AI note: cache to `sessions.config.practice_note` so it doesn't
+  // re-generate (and re-bill) on every refresh.
+  const cfg = (session.config ?? {}) as Record<string, unknown>;
+  let aiNote = (cfg.practice_note as string | undefined) ?? "";
+  if (!aiNote || aiNote.length < 30) {
+    aiNote = await generatePracticeNote(stats, baseline, sectionTitles);
+    // Best-effort cache write — don't fail the page if RLS blocks it.
+    try {
+      await supabase
+        .from("sessions")
+        .update({ config: { ...cfg, practice_note: aiNote } })
+        .eq("id", sessionId)
+        .eq("user_id", user.id);
+    } catch (e) {
+      console.warn("[practice/results] failed to cache practice_note", e);
+    }
+  }
+
   return (
-    <ResultsView
-      mode="practice"
-      score={Math.round(Number(session.score_pct ?? 0))}
-      total={summary.length}
-      correct={correct}
+    <PracticeResultsView
+      sessionId={sessionId}
       durationMs={session.duration_ms ?? 0}
-      attempts={summary}
-      primaryRetryHref="/practice"
+      stats={stats}
+      baseline={baseline}
+      sectionTitles={sectionTitles}
+      aiNote={aiNote}
     />
   );
 }
