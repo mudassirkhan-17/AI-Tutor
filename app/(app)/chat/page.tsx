@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SEEDS = [
@@ -71,13 +72,17 @@ export default function ChatPage() {
               >
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap",
+                    "max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed",
                     m.role === "user"
-                      ? "bg-primary text-primary-foreground"
+                      ? "whitespace-pre-wrap bg-primary text-primary-foreground"
                       : "bg-elevated border border-border text-ink",
                   )}
                 >
-                  {m.content}
+                  {m.role === "user" ? (
+                    m.content
+                  ) : (
+                    <ChatMarkdown content={m.content} className="text-[15px]" />
+                  )}
                 </div>
               </motion.div>
             ))}

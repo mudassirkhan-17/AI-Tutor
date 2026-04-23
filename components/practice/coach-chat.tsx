@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
 
 /* =====================================================================
  * CoachChat
@@ -768,7 +769,7 @@ function AssistantBubble({
     >
       <div
         className={cn(
-          "relative max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm leading-relaxed text-ink whitespace-pre-wrap",
+          "relative max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm leading-relaxed text-ink",
           "bg-elevated border border-border",
         )}
       >
@@ -780,7 +781,9 @@ function AssistantBubble({
           }}
           aria-hidden
         />
-        <span className="relative">{visible}</span>
+        <div className="relative min-w-0">
+          <ChatMarkdown content={visible} />
+        </div>
         {isTyping && (
           <span
             className="relative inline-block w-1 h-3.5 ml-0.5 align-middle bg-primary/70 motion-safe:animate-pulse"

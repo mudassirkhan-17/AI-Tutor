@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { SECTIONS, type SectionCode } from "@/lib/constants";
 import {
   type DebriefPlan,
@@ -582,11 +583,11 @@ function ChatStream({
                       className={cn(
                         "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
                         isUser
-                          ? "bg-primary text-primary-foreground"
+                          ? "whitespace-pre-wrap bg-primary text-primary-foreground"
                           : "bg-surface border border-border text-ink",
                       )}
                     >
-                      {text}
+                      {isUser ? text : <ChatMarkdown content={text} />}
                     </div>
                   );
                 }

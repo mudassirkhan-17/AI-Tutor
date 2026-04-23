@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Sparkles, Send, X, Loader2, BookOpen } from "lucide-react";
 import type { ChatQuestionContext } from "./chat-sheet-provider";
+import { ChatMarkdown } from "./chat-markdown";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function ChatSheet({
@@ -150,13 +151,17 @@ export function ChatSheet({
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
+                      "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
                       m.role === "user"
-                        ? "bg-primary text-primary-foreground"
+                        ? "whitespace-pre-wrap bg-primary text-primary-foreground"
                         : "bg-elevated border border-border text-ink",
                     )}
                   >
-                    {m.content}
+                    {m.role === "user" ? (
+                      m.content
+                    ) : (
+                      <ChatMarkdown content={m.content} />
+                    )}
                   </div>
                 </motion.div>
               ))}
