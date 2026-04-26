@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
 import { z } from "zod";
 import { getModel } from "@/lib/ai/provider";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { QuestionRow } from "@/lib/supabase/types";
 import { shuffle } from "@/lib/utils";
 
@@ -203,7 +204,10 @@ export async function generateSiblingQuestion({
         is_ai_generated: true,
       };
 
-      const { data, error } = await supabase
+      // Insert bypasses RLS: learners only have SELECT on `questions`; AI siblings
+      // are server-generated and persisted with the service role (same pattern as import).
+      const admin = createAdminClient();
+      const { data, error } = await admin
         .from("questions")
         .insert(insertRow)
         .select("*")

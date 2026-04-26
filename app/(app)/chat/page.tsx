@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { VoiceInputButton } from "@/components/chat/voice-input-button";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SEEDS = [
@@ -99,13 +100,23 @@ export default function ChatPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-4 flex items-center gap-2 bg-surface rounded-full border border-border shadow-soft p-1.5 pl-4"
+        className="sticky bottom-4 flex items-center gap-2 bg-surface rounded-full border border-border shadow-soft p-1.5 pl-4 pr-1.5"
       >
         <Input
           value={input}
           onChange={handleInputChange}
           placeholder="Ask about a concept, a question, or request a quiz…"
           className="flex-1 bg-transparent border-0 focus-visible:ring-0 h-10 shadow-none"
+        />
+        <VoiceInputButton
+          disabled={isLoading}
+          className="rounded-full"
+          onAppendTranscript={(t) =>
+            setInput((prev) => {
+              const base = prev.trimEnd();
+              return base ? `${base} ${t}` : t;
+            })
+          }
         />
         <Button type="submit" size="icon" disabled={!input.trim() || isLoading}>
           <Send className="h-4 w-4" />

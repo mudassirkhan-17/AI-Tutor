@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { VoiceInputButton } from "@/components/chat/voice-input-button";
 
 /* =====================================================================
  * CoachChat
@@ -525,6 +526,16 @@ function CoachConversation({
               autoFocus
             />
           </div>
+          <VoiceInputButton
+            disabled={inputDisabled}
+            className="rounded-2xl"
+            onAppendTranscript={(t) =>
+              setInput((prev) => {
+                const base = prev.trimEnd();
+                return base ? `${base} ${t}` : t;
+              })
+            }
+          />
           <Button
             type="submit"
             size="icon"

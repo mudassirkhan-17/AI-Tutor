@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Sparkles, Send, X, Loader2, BookOpen } from "lucide-react";
 import type { ChatQuestionContext } from "./chat-sheet-provider";
 import { ChatMarkdown } from "./chat-markdown";
+import { VoiceInputButton } from "./voice-input-button";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function ChatSheet({
@@ -185,6 +186,15 @@ export function ChatSheet({
             placeholder="Ask about a concept, a question, or request a quiz…"
             className="flex-1"
             autoFocus
+          />
+          <VoiceInputButton
+            disabled={isLoading}
+            onAppendTranscript={(t) =>
+              setInput((prev) => {
+                const base = prev.trimEnd();
+                return base ? `${base} ${t}` : t;
+              })
+            }
           />
           <Button type="submit" size="icon" disabled={!input.trim() || isLoading}>
             <Send className="h-4 w-4" />
