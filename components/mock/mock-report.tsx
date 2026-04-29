@@ -21,12 +21,14 @@ import {
   Target,
   Timer,
   Flame,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 import type { QuestionRow } from "@/lib/supabase/types";
 import type { Journey } from "@/lib/journey/load";
 import { JourneyPanel } from "@/components/results/journey-panel";
@@ -98,6 +100,42 @@ type Props = {
   initialPlan?: DebriefPlan | null;
   initialPlanCommitted?: boolean;
 };
+
+/* ----------------------------- download btn ----------------------------- */
+
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/report/mock-exam/${sessionId}/pdf`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body?.error ?? "PDF generation failed. Please try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mock-exam-report-${sessionId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Could not download PDF. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" onClick={handleDownload} disabled={loading}>
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
+  );
+}
 
 /* ------------------------------- helpers -------------------------------- */
 
@@ -221,6 +259,7 @@ export function MockReport({
                 Retake Mock
               </Link>
             </Button>
+            <DownloadPdfButton sessionId={sessionId} />
           </div>
         </div>
       </section>
