@@ -23,12 +23,14 @@ import {
   GraduationCap,
   ArrowRight,
   Zap,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 import type { PracticeStats, PracticeReviewItem } from "@/lib/practice/results";
 import type { PracticeBaseline } from "@/lib/practice/baseline";
 import type { Journey } from "@/lib/journey/load";
@@ -113,7 +115,7 @@ export function PracticeResultsView({
 
   return (
     <div className="space-y-6">
-      <Hero stats={stats} durationMs={durationMs} />
+      <Hero stats={stats} durationMs={durationMs} sessionId={sessionId} />
       <DebriefPanel
         snapshot={debriefSnapshot}
         initialPlan={initialPlan}
@@ -153,7 +155,7 @@ export function PracticeResultsView({
 /*  HERO                                                                  */
 /* ===================================================================== */
 
-function Hero({ stats, durationMs }: { stats: PracticeStats; durationMs: number }) {
+function Hero({ stats, durationMs, sessionId }: { stats: PracticeStats; durationMs: number; sessionId: string }) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
@@ -218,6 +220,7 @@ function Hero({ stats, durationMs }: { stats: PracticeStats; durationMs: number 
                 </Link>
               </Button>
             )}
+            <DownloadPdfButton sessionId={sessionId} />
           </div>
         </div>
       </div>
@@ -1328,6 +1331,45 @@ function ReviewRow({ item }: { item: PracticeReviewItem }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── Download PDF Button ─── */
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/report/practice/${sessionId}/pdf`);
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `practice-report-${sessionId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      toast.error("Could not generate PDF. Please try again.");
+      console.error("[Practice PDF download]", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      onClick={handleDownload}
+      disabled={loading}
+      className="gap-1.5"
+    >
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
   );
 }
 
