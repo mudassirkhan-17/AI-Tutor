@@ -22,6 +22,7 @@ import {
   Hourglass,
   Trophy,
   Activity,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,7 +103,6 @@ export function AssessmentReport({
   lengthLabel,
   coverage,
 }: Props) {
-  void sessionId;
   const strict = summary.accuracy_pct;
   const reach = summary.effective_pct;
   const lengthText =
@@ -166,6 +166,7 @@ export function AssessmentReport({
                   <RotateCcw className="h-4 w-4" /> Retake
                 </Link>
               </Button>
+              <DownloadPdfButton sessionId={sessionId} />
             </div>
           </div>
 
@@ -1457,5 +1458,45 @@ function ReviewRow({
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── Download PDF Button ─── */
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/report/assessment/${sessionId}/pdf`,
+      );
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `assessment-report-${sessionId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore — could add toast here
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      onClick={handleDownload}
+      disabled={loading}
+      className="gap-1.5"
+    >
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
   );
 }
