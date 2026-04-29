@@ -113,6 +113,7 @@ const s = StyleSheet.create({
   },
   scoreBox: {
     width: 92,
+    height: 92,
     alignItems: "center",
     position: "relative",
   },
@@ -120,7 +121,10 @@ const s = StyleSheet.create({
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   scorePct: {
     fontSize: 20,

@@ -92,12 +92,12 @@ const s = StyleSheet.create({
   },
   scoreInsideText: {
     position: "absolute",
+    width: 90,
+    height: 90,
     alignItems: "center",
     justifyContent: "center",
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
   },
   scorePct: {
     fontSize: 22,
