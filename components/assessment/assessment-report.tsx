@@ -167,7 +167,7 @@ export function AssessmentReport({
                   <RotateCcw className="h-4 w-4" /> Retake
                 </Link>
               </Button>
-              <DownloadPdfButton sessionId={sessionId} />
+              <DownloadPdfButton sessionId={sessionId} allCovered={coverage.allCovered} />
             </div>
           </div>
 
@@ -1463,25 +1463,37 @@ function ReviewRow({
 }
 
 /* ─── Download PDF Button ─── */
-function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+function DownloadPdfButton({
+  sessionId,
+  allCovered,
+}: {
+  sessionId: string;
+  allCovered: boolean;
+}) {
   const [loading, setLoading] = React.useState(false);
 
   async function handleDownload() {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/report/assessment/${sessionId}/pdf`,
-      );
+      /* When all 12 sections are covered, download the comprehensive
+         overall report that combines data from every session. */
+      const url = allCovered
+        ? "/api/report/assessment/overall/pdf"
+        : `/api/report/assessment/${sessionId}/pdf`;
+
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to generate PDF");
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `assessment-report-${sessionId.slice(0, 8)}.pdf`;
+      a.href = objectUrl;
+      a.download = allCovered
+        ? "overall-assessment-report.pdf"
+        : `assessment-report-${sessionId.slice(0, 8)}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
     } catch (err) {
       toast.error("Could not generate PDF. Please try again.");
       console.error("[PDF download]", err);
@@ -1492,13 +1504,17 @@ function DownloadPdfButton({ sessionId }: { sessionId: string }) {
 
   return (
     <Button
-      variant="outline"
+      variant={allCovered ? "default" : "outline"}
       onClick={handleDownload}
       disabled={loading}
       className="gap-1.5"
     >
       <Download className="h-4 w-4" />
-      {loading ? "Generating…" : "Download PDF"}
+      {loading
+        ? "Generating…"
+        : allCovered
+          ? "Download Overall Report"
+          : "Download PDF"}
     </Button>
   );
 }
