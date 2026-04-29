@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
@@ -12,6 +15,7 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
+  try {
   const { sessionId } = await params;
   const supabase = await createClient();
 
@@ -105,4 +109,11 @@ export async function GET(
       "Cache-Control": "private, no-cache",
     },
   });
+  } catch (err) {
+    console.error("[PDF] render failed:", err);
+    return NextResponse.json(
+      { error: "PDF generation failed", detail: String(err) },
+      { status: 500 },
+    );
+  }
 }

@@ -34,6 +34,7 @@ import type {
   RawAttempt,
 } from "@/lib/assessment/summary";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 
 // SC salesperson exam pass line.
 const PASS_THRESHOLD = 70;
@@ -1481,8 +1482,9 @@ function DownloadPdfButton({ sessionId }: { sessionId: string }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      // silently ignore — could add toast here
+    } catch (err) {
+      toast.error("Could not generate PDF. Please try again.");
+      console.error("[PDF download]", err);
     } finally {
       setLoading(false);
     }
