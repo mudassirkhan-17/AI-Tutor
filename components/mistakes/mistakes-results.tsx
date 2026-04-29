@@ -19,12 +19,14 @@ import {
   AlertTriangle,
   Flame,
   ArrowRight,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 import type { MistakesStats, MistakesReviewItem } from "@/lib/mistakes/results";
 import type { Journey } from "@/lib/journey/load";
 import { JourneyPanel } from "@/components/results/journey-panel";
@@ -90,7 +92,7 @@ export function MistakesResultsView({
 
   return (
     <div className="space-y-6">
-      <Hero stats={stats} durationMs={durationMs} />
+      <Hero stats={stats} durationMs={durationMs} sessionId={sessionId} />
       <DebriefPanel
         snapshot={debriefSnapshot}
         initialPlan={initialPlan}
@@ -118,7 +120,7 @@ export function MistakesResultsView({
 /*  HERO                                                                  */
 /* ===================================================================== */
 
-function Hero({ stats, durationMs }: { stats: MistakesStats; durationMs: number }) {
+function Hero({ stats, durationMs, sessionId }: { stats: MistakesStats; durationMs: number; sessionId: string }) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
@@ -193,6 +195,7 @@ function Hero({ stats, durationMs }: { stats: MistakesStats; durationMs: number 
                 </Link>
               </Button>
             )}
+            <DownloadPdfButton sessionId={sessionId} />
           </div>
         </div>
       </div>
@@ -887,3 +890,41 @@ function ReviewRow({
   );
 }
 
+/* ─── Download PDF Button ─── */
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/report/mistakes/${sessionId}/pdf`);
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `mistakes-report-${sessionId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      toast.error("Could not generate PDF. Please try again.");
+      console.error("[Mistakes PDF download]", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      onClick={handleDownload}
+      disabled={loading}
+      className="gap-1.5"
+    >
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
+  );
+}
