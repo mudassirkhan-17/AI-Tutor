@@ -34,6 +34,7 @@ import { StreakFlame } from "@/components/kpi/streak-flame";
 import { ModeCards } from "@/components/kpi/mode-cards";
 import { Sparkline } from "@/components/kpi/sparkline";
 import { cn, formatMs } from "@/lib/utils";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export type DashboardNextAction = {
   title: string;
@@ -420,7 +421,7 @@ function HeroSection({
                 <Button asChild size="lg" className="shadow-soft">
                   <Link href={continueAssessmentHref}>
                     {coverage.nextSection
-                      ? `Continue assessment · ${coverage.nextSection}`
+                      ? `Continue assessment · ${formatSectionDisplayLabel(coverage.nextSection)}`
                       : "Continue assessment"}
                   </Link>
                 </Button>
@@ -475,7 +476,7 @@ function NationalStateCard({ national, state }: { national: number; state: numbe
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-ink-muted">National (A1–A6)</span>
+                <span className="text-ink-muted">National portion</span>
                 <span className="font-semibold tabular-nums text-ink">{national}%</span>
               </div>
               <div className="h-2.5 rounded-full bg-muted overflow-hidden">
@@ -489,7 +490,7 @@ function NationalStateCard({ national, state }: { national: number; state: numbe
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-ink-muted">South Carolina (B1–B6)</span>
+                <span className="text-ink-muted">South Carolina state portion</span>
                 <span className="font-semibold tabular-nums text-ink">{state}%</span>
               </div>
               <div className="h-2.5 rounded-full bg-muted overflow-hidden">

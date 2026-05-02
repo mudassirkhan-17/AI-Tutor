@@ -577,7 +577,7 @@ export function FinalPdf({
             <Text style={s.headerDate}>Generated {dateStr}</Text>
           </View>
           <Text style={s.headerTagline}>
-            {`${report.nationalTotal}Q National (A1–A6)  +  ${report.stateTotal}Q State (B1–B6)  ·  Pass per portion: ${passPct}%  ·  Duration: ${fmtMs(durationMs)}`}
+            {`${report.nationalTotal}Q National  +  ${report.stateTotal}Q South Carolina  ·  Pass per portion: ${passPct}%  ·  Duration: ${fmtMs(durationMs)}`}
           </Text>
         </View>
 
@@ -599,7 +599,7 @@ export function FinalPdf({
               <View style={[s.portionRow, { backgroundColor: "#F5F8FD" }]}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                    <Text style={[s.portionLabel, { color: C.national }]}>National Portion (A1–A6)</Text>
+                    <Text style={[s.portionLabel, { color: C.national }]}>National Portion</Text>
                     <View style={[s.portionPassBadge, {
                       backgroundColor: report.nationalPassed ? C.successLight : C.dangerLight,
                       color: report.nationalPassed ? C.success : C.danger,
@@ -623,7 +623,7 @@ export function FinalPdf({
               <View style={[s.portionRow, { backgroundColor: "#F8F5FD" }]}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                    <Text style={[s.portionLabel, { color: C.state }]}>SC State Portion (B1–B6)</Text>
+                    <Text style={[s.portionLabel, { color: C.state }]}>SC State Portion</Text>
                     <View style={[s.portionPassBadge, {
                       backgroundColor: report.statePassed ? C.successLight : C.dangerLight,
                       color: report.statePassed ? C.success : C.danger,

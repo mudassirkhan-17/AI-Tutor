@@ -66,19 +66,17 @@ function getNextBestAction(
   }
   if (!coverage.allCovered) {
     const next = coverage.nextSection;
-    const nextTitle = next
-      ? SECTIONS.find((s) => s.code === next)?.title ?? ""
-      : "";
+    const nextLabel = next ? formatSectionDisplayLabel(next) : "";
     const continueHref = coverage.missing.length
       ? `/assessment?sections=${coverage.missing.join(",")}`
       : "/assessment";
     const left = coverage.missing.length;
     return {
       title: next
-        ? `Finish the assessment — ${next}: ${nextTitle} is next.`
+        ? `Finish the assessment — ${nextLabel} is next.`
         : "Finish the assessment to unlock Practice.",
       detail: `Practice adapts to your weak spots, but needs a baseline on every section first. ${left} section${left === 1 ? "" : "s"} to go.`,
-      cta: next ? `Continue with ${next}` : "Continue assessment",
+      cta: next ? `Continue: ${nextLabel}` : "Continue assessment",
       href: continueHref,
     };
   }

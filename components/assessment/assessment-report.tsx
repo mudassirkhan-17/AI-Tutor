@@ -117,9 +117,7 @@ export function AssessmentReport({
           : null;
 
   const nextSection = coverage.nextSection;
-  const nextTitle = nextSection
-    ? sectionTitles[nextSection] ?? ""
-    : "";
+  const nextLabel = nextSection ? formatSectionDisplayLabel(nextSection) : "";
   const continueHref = coverage.missing.length
     ? `/assessment?sections=${coverage.missing.join(",")}`
     : "/assessment";
@@ -127,7 +125,7 @@ export function AssessmentReport({
   const primaryCtaLabel = coverage.allCovered
     ? "Start practice"
     : nextSection
-      ? `Continue with ${nextSection}`
+      ? `Continue: ${nextLabel}`
       : "Continue assessment";
 
   return (
@@ -199,7 +197,7 @@ export function AssessmentReport({
             coverage={coverage}
             continueHref={continueHref}
             nextSection={nextSection}
-            nextTitle={nextTitle}
+            nextLabel={nextLabel}
           />
         </div>
       </section>
@@ -282,7 +280,7 @@ export function AssessmentReport({
               ) : (
                 <Button asChild size="sm" variant="soft">
                   <Link href={continueHref}>
-                    {nextSection ? `Continue with ${nextSection}` : "Continue assessment"}
+                    {nextSection ? `Continue: ${nextLabel}` : "Continue assessment"}
                   </Link>
                 </Button>
               )}
@@ -351,12 +349,12 @@ function CoverageNotice({
   coverage,
   continueHref,
   nextSection,
-  nextTitle,
+  nextLabel,
 }: {
   coverage: Coverage;
   continueHref: string;
   nextSection: string | null;
-  nextTitle: string;
+  nextLabel: string;
 }) {
   const total = coverage.covered.length + coverage.missing.length;
   const done = coverage.covered.length;
@@ -393,8 +391,7 @@ function CoverageNotice({
         {nextSection && (
           <Button asChild size="sm" variant="outline">
             <Link href={continueHref}>
-              Continue with {nextSection}
-              {nextTitle ? `: ${nextTitle}` : ""}
+              Continue: {nextLabel}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

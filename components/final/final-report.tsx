@@ -151,7 +151,7 @@ export function FinalReport({
       <div className="grid gap-4 md:grid-cols-2">
         <PortionCard
           label="National portion"
-          subtitle="Sections A1–A6"
+          subtitle="6 National sections"
           correct={report.nationalCorrect}
           total={report.nationalTotal}
           accuracyPct={report.nationalPct}
@@ -161,7 +161,7 @@ export function FinalReport({
         />
         <PortionCard
           label="South Carolina portion"
-          subtitle="Sections B1–B6"
+          subtitle="6 State sections"
           correct={report.stateCorrect}
           total={report.stateTotal}
           accuracyPct={report.statePct}

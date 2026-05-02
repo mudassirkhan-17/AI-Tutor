@@ -185,7 +185,7 @@ export function AssessmentPicker({
                 </div>
                 {coverage.nextSection && (
                   <span className="text-xs text-ink-muted">
-                    Next up: <b className="text-ink">{coverage.nextSection}</b>
+                    Next up: <b className="text-ink">{formatSectionDisplayLabel(coverage.nextSection)}</b>
                   </span>
                 )}
               </div>

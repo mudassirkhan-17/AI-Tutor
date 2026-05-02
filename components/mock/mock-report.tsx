@@ -306,14 +306,14 @@ export function MockReport({
           correct={nationalCorrect}
           total={nationalTotal}
           passPct={passPct}
-          hint="Sections A1–A6. The real exam has 80 here."
+          hint="National portion (6 sections). The real exam has 80 here."
         />
         <SubscoreGauge
           label="South Carolina"
           correct={stateCorrect}
           total={stateTotal}
           passPct={passPct}
-          hint="Sections B1–B6. The real exam has 40 here."
+          hint="South Carolina state portion (6 sections). The real exam has 40 here."
         />
       </div>
 
