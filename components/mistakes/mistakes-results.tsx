@@ -33,13 +33,13 @@ import { JourneyPanel } from "@/components/results/journey-panel";
 import { DebriefPanel } from "@/components/coach/debrief-panel";
 import type { DebriefPlan } from "@/lib/coach/debrief-plan";
 import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Props = {
   sessionId: string;
   durationMs: number;
   stats: MistakesStats;
   journey: Journey;
-  sectionTitles: Record<string, string>;
   aiNote: string;
   initialPlan?: DebriefPlan | null;
   initialPlanCommitted?: boolean;
@@ -58,7 +58,6 @@ export function MistakesResultsView({
   durationMs,
   stats,
   journey,
-  sectionTitles,
   aiNote,
   initialPlan,
   initialPlanCommitted,
@@ -66,7 +65,7 @@ export function MistakesResultsView({
   const sectionSnapshot = enrichSections(
     stats.bySection.map((s) => ({
       code: s.code,
-      title: sectionTitles[s.code],
+      title: formatSectionDisplayLabel(s.code),
       total: s.total,
       correct: s.recovered,
       accuracy: s.accuracy,
@@ -109,9 +108,9 @@ export function MistakesResultsView({
 
       <SpeedCard stats={stats} durationMs={durationMs} />
 
-      <SectionBreakdown stats={stats} sectionTitles={sectionTitles} />
+      <SectionBreakdown stats={stats} />
 
-      <QuestionReview review={stats.review} sectionTitles={sectionTitles} />
+      <QuestionReview review={stats.review} />
     </div>
   );
 }
@@ -649,10 +648,8 @@ function SpeedTile({ label, value, sub }: { label: string; value: string; sub: s
 
 function SectionBreakdown({
   stats,
-  sectionTitles,
 }: {
   stats: MistakesStats;
-  sectionTitles: Record<string, string>;
 }) {
   return (
     <Card>
@@ -677,10 +674,9 @@ function SectionBreakdown({
               <div key={s.code} className="rounded-xl border border-border px-4 py-3">
                 <div className="flex items-center gap-3">
                   <Icon className={cn("h-4 w-4 shrink-0", tone.cls)} />
-                  <Badge variant="outline">{s.code}</Badge>
-                  <span className="text-sm text-ink truncate max-w-[260px] md:max-w-[420px]">
-                    {sectionTitles[s.code] ?? s.code}
-                  </span>
+                  <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug max-w-[min(100%,22rem)]">
+                    {formatSectionDisplayLabel(s.code)}
+                  </Badge>
                   <div className="ml-auto flex items-center gap-3">
                     <span className="text-sm text-ink-muted tabular-nums">
                       {s.recovered}/{s.total}
@@ -713,10 +709,8 @@ function SectionBreakdown({
 
 function QuestionReview({
   review,
-  sectionTitles,
 }: {
   review: MistakesReviewItem[];
-  sectionTitles: Record<string, string>;
 }) {
   type Filter = "all" | "leaking" | "fixed";
   const [filter, setFilter] = React.useState<Filter>("all");
@@ -762,11 +756,7 @@ function QuestionReview({
             </p>
           ) : (
             filtered.map((r) => (
-              <ReviewRow
-                key={r.question.id + r.index}
-                item={r}
-                sectionTitle={sectionTitles[r.question.section_code]}
-              />
+              <ReviewRow key={r.question.id + r.index} item={r} />
             ))
           )}
         </div>
@@ -777,10 +767,8 @@ function QuestionReview({
 
 function ReviewRow({
   item,
-  sectionTitle,
 }: {
   item: MistakesReviewItem;
-  sectionTitle?: string;
 }) {
   const { open } = useChatSheet();
   const [expanded, setExpanded] = React.useState(false);
@@ -808,8 +796,7 @@ function ReviewRow({
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted flex items-center gap-2 flex-wrap">
             <span>
-              Q{item.index + 1} · {q.section_code}
-              {sectionTitle ? ` · ${sectionTitle}` : ""}
+              Q{item.index + 1} · {formatSectionDisplayLabel(q.section_code)}
             </span>
             <span className="capitalize">· {q.level}</span>
             {hinted && (

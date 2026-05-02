@@ -31,6 +31,7 @@ import {
   DEFAULT_PLAN,
   sanitizePlan,
 } from "@/lib/coach/debrief-plan";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ------------------------------ Types & props ----------------------------- */
 
@@ -902,9 +903,9 @@ function PlanPreview({
       </div>
       <div className="space-y-1">
         {preview.map((row) => (
-          <div key={row.code} className="flex items-center gap-2">
-            <span className="w-6 shrink-0 text-[10px] font-semibold tabular-nums text-ink-muted">
-              {row.code}
+          <div key={row.code} className="flex items-center gap-2 min-w-0">
+            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-ink-muted">
+              {formatSectionDisplayLabel(row.code)}
             </span>
             <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
               <motion.div

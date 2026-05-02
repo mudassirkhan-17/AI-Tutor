@@ -35,6 +35,7 @@ import { JourneyPanel } from "@/components/results/journey-panel";
 import { DebriefPanel } from "@/components/coach/debrief-panel";
 import type { DebriefPlan } from "@/lib/coach/debrief-plan";
 import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ------------------------------- types ---------------------------------- */
 
@@ -589,14 +590,10 @@ function SectionMatrixRow({
   return (
     <div className="rounded-xl border border-border px-4 py-3">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Badge variant="outline">{row.code}</Badge>
-          <span className="text-sm text-ink truncate max-w-[200px] md:max-w-[280px]">
-            {row.title}
-          </span>
-          <span className="text-xs text-ink-muted shrink-0">
-            ({row.group === "National" ? "Nat." : "SC"})
-          </span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug">
+            {formatSectionDisplayLabel(row.code)}
+          </Badge>
         </div>
         <div className="ml-auto flex items-center gap-3">
           {belowBar && (
@@ -978,7 +975,7 @@ function ReviewRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted">
-            Q{index + 1} · {q.section_code} · {q.level}
+            Q{index + 1} · {formatSectionDisplayLabel(q.section_code)} · {q.level}
           </div>
           <div className="text-sm text-ink truncate">{q.prompt}</div>
         </div>

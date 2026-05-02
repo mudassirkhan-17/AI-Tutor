@@ -22,6 +22,7 @@ import {
   FINAL_PASS_PCT,
 } from "@/lib/final/pick-questions";
 import type { GateStatus } from "@/lib/final/completion";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type PoolStatus = {
   poolUsed: "final_holdout" | "standard";
@@ -299,8 +300,10 @@ function PoolDepletionNote({
               )}
               {lowSections.slice(0, 4).map((s) => (
                 <li key={s.code}>
-                  <span className="font-medium text-ink">{s.code}</span>: only{" "}
-                  {s.unseen} unseen, need {s.requested}.
+                  <span className="font-medium text-ink">
+                    {formatSectionDisplayLabel(s.code)}
+                  </span>
+                  : only {s.unseen} unseen, need {s.requested}.
                 </li>
               ))}
             </ul>

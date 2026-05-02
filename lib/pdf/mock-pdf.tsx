@@ -15,6 +15,7 @@ import type {
   Verdict,
   Calibration,
 } from "@/components/mock/mock-report";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ─── Brand colours ─── */
 const C = {
@@ -565,7 +566,6 @@ export function MockPdf({
             <View style={[s.sectionTable, { marginBottom: 8 }]}>
               <View style={s.tableHeader}>
                 <View style={s.colGroup}><Text style={[s.thCell, { color: C.national }]}>Nat</Text></View>
-                <View style={s.colCode} />
                 <View style={s.colName}><Text style={s.thCell}>Section</Text></View>
                 <View style={s.colBar}><Text style={s.thCell}>Accuracy</Text></View>
                 <View style={s.colPct}><Text style={s.thCell}>Score</Text></View>
@@ -579,8 +579,7 @@ export function MockPdf({
                     <View style={s.colGroup}>
                       <Text style={[s.cellGroup, { backgroundColor: "#DDE8F5", color: C.national }]}>Nat</Text>
                     </View>
-                    <View style={s.colCode}><Text style={s.cellCode}>{sec.code}</Text></View>
-                    <View style={s.colName}><Text style={s.cellName}>{sec.title}</Text></View>
+                    <View style={s.colName}><Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text></View>
                     <View style={s.colBar}>
                       <View style={s.progressTrack}>
                         <View style={[s.progressFill, { width: `${Math.max(2, sec.accuracyPct)}%`, backgroundColor: color }]} />
@@ -599,7 +598,6 @@ export function MockPdf({
             <View style={[s.sectionTable, { marginBottom: 16 }]}>
               <View style={s.tableHeader}>
                 <View style={s.colGroup}><Text style={[s.thCell, { color: C.state }]}>SC</Text></View>
-                <View style={s.colCode} />
                 <View style={s.colName}><Text style={s.thCell}>Section</Text></View>
                 <View style={s.colBar}><Text style={s.thCell}>Accuracy</Text></View>
                 <View style={s.colPct}><Text style={s.thCell}>Score</Text></View>
@@ -613,8 +611,7 @@ export function MockPdf({
                     <View style={s.colGroup}>
                       <Text style={[s.cellGroup, { backgroundColor: "#EDE5F5", color: C.state }]}>SC</Text>
                     </View>
-                    <View style={s.colCode}><Text style={s.cellCode}>{sec.code}</Text></View>
-                    <View style={s.colName}><Text style={s.cellName}>{sec.title}</Text></View>
+                    <View style={s.colName}><Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text></View>
                     <View style={s.colBar}>
                       <View style={s.progressTrack}>
                         <View style={[s.progressFill, { width: `${Math.max(2, sec.accuracyPct)}%`, backgroundColor: color }]} />

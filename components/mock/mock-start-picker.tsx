@@ -14,6 +14,7 @@ import {
   MOCK_DURATION_MIN,
   MOCK_PASS_PCT,
 } from "@/lib/mock/pick-questions";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Length = "full" | "smoke";
 
@@ -142,9 +143,8 @@ export function MockStartPicker({ weakest, signalSize }: Props) {
                     key={w.code}
                     className="inline-flex items-center gap-2 rounded-full bg-surface border border-border px-3 py-1"
                   >
-                    <span className="font-medium text-ink">{w.code}</span>
-                    <span className="text-ink-muted truncate max-w-[180px]">
-                      {w.title}
+                    <span className="font-medium text-ink leading-snug max-w-[240px]">
+                      {formatSectionDisplayLabel(w.code)}
                     </span>
                     <Badge variant="outline" className="text-[10px]">
                       {w.accuracy}% acc

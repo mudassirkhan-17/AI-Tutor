@@ -18,6 +18,7 @@ import {
   Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Section = {
   code: string;
@@ -281,20 +282,20 @@ export function AssessmentPicker({
                 >
                   <div
                     className={cn(
-                      "h-9 w-9 rounded-xl grid place-items-center text-sm font-semibold border shrink-0",
+                      "h-9 w-9 rounded-xl grid place-items-center text-[10px] font-semibold leading-tight border shrink-0 px-1 text-center",
                       active
                         ? "bg-primary text-primary-foreground border-transparent"
                         : "bg-muted text-ink-muted border-border",
                     )}
                   >
-                    {s.code}
+                    {s.group === "National" ? "Nat" : "SC"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-ink truncate">
-                      {s.title}
+                    <div className="text-sm font-medium text-ink leading-snug">
+                      {formatSectionDisplayLabel(s.code)}
                     </div>
                     <div className="text-xs text-ink-muted">
-                      {s.group} · {s.count.toLocaleString()} questions
+                      {s.count.toLocaleString()} questions
                       {done && fr?.daysSinceAssessed != null && (
                         <span className="ml-1 text-success">
                           · fresh

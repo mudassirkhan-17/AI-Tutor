@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn, pct } from "@/lib/utils";
 import type { QuestionRow, ResultLabel } from "@/lib/supabase/types";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Props = {
   sessionId: string;
@@ -292,7 +293,9 @@ export function AssessmentRunner({
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
-              <Badge variant="outline">{q.section_code}</Badge>
+              <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug max-w-[min(100%,22rem)]">
+                {formatSectionDisplayLabel(q.section_code)}
+              </Badge>
               <span className="text-ink-muted capitalize">· {q.level}</span>
               {q.concept_id && (
                 <span

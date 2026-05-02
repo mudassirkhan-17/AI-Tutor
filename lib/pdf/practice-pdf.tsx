@@ -9,6 +9,7 @@ import {
   Circle,
 } from "@react-pdf/renderer";
 import type { PracticeStats } from "@/lib/practice/results";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ─── Brand colours ─── */
 const C = {
@@ -368,7 +369,6 @@ export interface PracticePdfProps {
   stats: PracticeStats;
   sessionId: string;
   durationMs: number;
-  sectionTitles: Record<string, string>;
   aiNote: string;
   generatedAt?: string;
 }
@@ -377,7 +377,6 @@ export interface PracticePdfProps {
 export function PracticePdf({
   stats,
   durationMs,
-  sectionTitles,
   aiNote,
   generatedAt,
 }: PracticePdfProps) {
@@ -508,23 +507,18 @@ export function PracticePdf({
               <Text style={s.sectionTitle}>Section Breakdown</Text>
               <View style={s.sectionTable}>
                 <View style={s.tableHeader}>
-                  <View style={s.colCode}><Text style={s.thCell}>Code</Text></View>
                   <View style={s.colName}><Text style={s.thCell}>Section</Text></View>
                   <View style={s.colBar}><Text style={s.thCell}>Accuracy</Text></View>
                   <View style={s.colPct}><Text style={s.thCell}>Score</Text></View>
                   <View style={s.colQs}><Text style={s.thCell}>Qs</Text></View>
                 </View>
                 {stats.bySection.map((sec, i) => {
-                  const title = sectionTitles[sec.code] ?? sec.code;
                   const color = accuracyColor(sec.accuracy);
                   const isLast = i === stats.bySection.length - 1;
                   return (
                     <View key={sec.code} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}, isLast ? s.tableRowLast : {}]}>
-                      <View style={s.colCode}>
-                        <Text style={s.cellCode}>{sec.code}</Text>
-                      </View>
                       <View style={s.colName}>
-                        <Text style={s.cellName}>{title}</Text>
+                        <Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text>
                       </View>
                       <View style={s.colBar}>
                         <View style={s.progressTrack}>

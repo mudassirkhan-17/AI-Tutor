@@ -7,7 +7,6 @@ import React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { buildSummary } from "@/lib/assessment/summary";
 import type { AssessmentSummary } from "@/lib/assessment/summary";
-import { SECTIONS } from "@/lib/constants";
 import { AssessmentPdf } from "@/lib/pdf/assessment-pdf";
 import type { DocumentProps } from "@react-pdf/renderer";
 
@@ -77,10 +76,6 @@ export async function GET(
     for (const r of rows ?? []) conceptTitles[r.id] = r.title;
   }
 
-  const sectionTitles = Object.fromEntries(
-    SECTIONS.map((s) => [s.code, s.title]),
-  );
-
   const generatedAt = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
@@ -94,7 +89,6 @@ export async function GET(
     summary,
     sessionId,
     durationMs: session.duration_ms ?? 0,
-    sectionTitles,
     conceptTitles,
     tutorLetter,
     generatedAt,

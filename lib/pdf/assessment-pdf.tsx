@@ -9,6 +9,7 @@ import {
   Circle,
 } from "@react-pdf/renderer";
 import type { AssessmentSummary } from "@/lib/assessment/summary";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ─── Brand colours (matching app globals.css) ─── */
 const C = {
@@ -363,7 +364,6 @@ export interface AssessmentPdfProps {
   summary: AssessmentSummary;
   sessionId: string;
   durationMs: number;
-  sectionTitles: Record<string, string>;
   conceptTitles: Record<string, string>;
   tutorLetter: string | null;
   generatedAt?: string;
@@ -374,7 +374,6 @@ export function AssessmentPdf({
   summary,
   sessionId,
   durationMs,
-  sectionTitles,
   conceptTitles,
   tutorLetter,
   generatedAt,
@@ -488,19 +487,17 @@ export function AssessmentPdf({
           <Text style={s.sectionTitle}>Section Breakdown</Text>
           <View style={s.sectionsGrid}>
             {summary.sections.map((sec) => {
-              const title = sectionTitles[sec.code] ?? sec.code;
               const color = accuracyColor(sec.accuracy);
               return (
                 <View key={sec.code} style={s.sectionCard}>
                   <View style={s.sectionCardHeader}>
-                    <Text style={s.sectionCode}>{sec.code}</Text>
+                    <Text style={[s.sectionName, { flex: 1, paddingRight: 6 }]}>
+                      {formatSectionDisplayLabel(sec.code)}
+                    </Text>
                     <Text style={[s.sectionPct, { color }]}>
                       {sec.accuracy}%
                     </Text>
                   </View>
-                  <Text style={s.sectionName}>
-                    {title}
-                  </Text>
                   <View style={s.progressTrack}>
                     <View
                       style={[
@@ -622,7 +619,9 @@ export function AssessmentPdf({
                           : {},
                       ]}
                     >
-                      <Text style={s.conceptSection}>{c.section_code}</Text>
+                      <Text style={s.conceptSection}>
+                        {formatSectionDisplayLabel(c.section_code)}
+                      </Text>
                       <Text style={s.conceptTitle}>
                         {title}
                       </Text>

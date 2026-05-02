@@ -8,6 +8,7 @@ import {
 } from "@react-pdf/renderer";
 import type { FinalReport, VerdictTier } from "@/lib/final/report";
 import type { Journey } from "@/lib/journey/load";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ─── Brand colours ─── */
 const C = {
@@ -715,7 +716,6 @@ export function FinalPdf({
             <View style={[s.sectionTable, { marginBottom: 8 }]}>
               <View style={s.tableHeader}>
                 <View style={s.colGroup}><Text style={[s.thCell, { color: C.national }]}>Nat</Text></View>
-                <View style={s.colCode} />
                 <View style={s.colName}><Text style={s.thCell}>Section</Text></View>
                 <View style={s.colBar}><Text style={s.thCell}>Accuracy</Text></View>
                 <View style={s.colPct}><Text style={s.thCell}>Score</Text></View>
@@ -729,8 +729,7 @@ export function FinalPdf({
                     <View style={s.colGroup}>
                       <Text style={[s.cellGroup, { backgroundColor: C.nationalLight, color: C.national }]}>Nat</Text>
                     </View>
-                    <View style={s.colCode}><Text style={s.cellCode}>{sec.code}</Text></View>
-                    <View style={s.colName}><Text style={s.cellName}>{sec.title}</Text></View>
+                    <View style={s.colName}><Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text></View>
                     <View style={s.colBar}>
                       <View style={s.progressTrack}>
                         <View style={[s.progressFill, { width: `${Math.max(2, sec.accuracyPct)}%`, backgroundColor: color }]} />
@@ -748,7 +747,6 @@ export function FinalPdf({
             <View style={[s.sectionTable, { marginBottom: 0 }]}>
               <View style={s.tableHeader}>
                 <View style={s.colGroup}><Text style={[s.thCell, { color: C.state }]}>SC</Text></View>
-                <View style={s.colCode} />
                 <View style={s.colName}><Text style={s.thCell}>Section</Text></View>
                 <View style={s.colBar}><Text style={s.thCell}>Accuracy</Text></View>
                 <View style={s.colPct}><Text style={s.thCell}>Score</Text></View>
@@ -762,8 +760,7 @@ export function FinalPdf({
                     <View style={s.colGroup}>
                       <Text style={[s.cellGroup, { backgroundColor: C.stateLight, color: C.state }]}>SC</Text>
                     </View>
-                    <View style={s.colCode}><Text style={s.cellCode}>{sec.code}</Text></View>
-                    <View style={s.colName}><Text style={s.cellName}>{sec.title}</Text></View>
+                    <View style={s.colName}><Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text></View>
                     <View style={s.colBar}>
                       <View style={s.progressTrack}>
                         <View style={[s.progressFill, { width: `${Math.max(2, sec.accuracyPct)}%`, backgroundColor: color }]} />

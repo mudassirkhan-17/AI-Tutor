@@ -6,7 +6,6 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { buildPracticeStats, type PracticeAttempt } from "@/lib/practice/results";
-import { SECTIONS } from "@/lib/constants";
 import { PracticePdf } from "@/lib/pdf/practice-pdf";
 import type { DocumentProps } from "@react-pdf/renderer";
 
@@ -54,10 +53,6 @@ export async function GET(
     const cfg = (session.config ?? {}) as Record<string, unknown>;
     const aiNote = (cfg.practice_note as string | undefined) ?? "";
 
-    const sectionTitles = Object.fromEntries(
-      SECTIONS.map((s) => [s.code, s.title]),
-    );
-
     const generatedAt = new Date().toLocaleDateString("en-US", {
       weekday: "short",
       year: "numeric",
@@ -69,7 +64,6 @@ export async function GET(
       stats,
       sessionId,
       durationMs: session.duration_ms ?? 0,
-      sectionTitles,
       aiNote,
       generatedAt,
     }) as unknown as React.ReactElement<DocumentProps>;

@@ -18,6 +18,7 @@ import type { ChatQuestionContext } from "./chat-sheet-provider";
 import { ChatMarkdown } from "./chat-markdown";
 import { VoiceInputButton } from "./voice-input-button";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export function ChatSheet({
   open,
@@ -94,9 +95,9 @@ export function ChatSheet({
           <div className="px-6 pt-4">
             <div className="rounded-xl border border-border bg-elevated p-3 text-xs">
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <Badge variant="outline" className="gap-1">
-                  <BookOpen className="h-3 w-3" />
-                  {questionContext.section_code}
+                <Badge variant="outline" className="gap-1 text-left whitespace-normal font-normal leading-snug">
+                  <BookOpen className="h-3 w-3 shrink-0" />
+                  {formatSectionDisplayLabel(questionContext.section_code)}
                 </Badge>
                 <button
                   className="text-ink-muted hover:text-ink"

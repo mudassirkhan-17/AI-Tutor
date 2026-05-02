@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SectionMastery } from "@/lib/kpi/stats";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 function colorFor(acc: number, total: number) {
   if (total === 0) return "bg-muted text-ink-muted";
@@ -28,7 +29,9 @@ export function MasteryMap({ mastery }: { mastery: SectionMastery[] }) {
                 colorFor(m.accuracy, m.total),
               )}
             >
-              <div className="font-mono text-xs opacity-70">{m.code}</div>
+              <div className="text-[9px] leading-tight opacity-90 line-clamp-2 font-medium">
+                {formatSectionDisplayLabel(m.code)}
+              </div>
               <div className="font-serif text-xl font-semibold tabular-nums">
                 {m.total === 0 ? "—" : `${m.accuracy}%`}
               </div>
@@ -38,8 +41,8 @@ export function MasteryMap({ mastery }: { mastery: SectionMastery[] }) {
             </motion.div>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <div className="text-xs">
-              <div className="font-medium">{m.title}</div>
+            <div className="text-xs max-w-[240px]">
+              <div className="font-medium">{formatSectionDisplayLabel(m.code)}</div>
               <div className="opacity-80 mt-0.5">
                 {m.total === 0 ? "Not attempted yet" : `${m.correct}/${m.total} correct`}
               </div>

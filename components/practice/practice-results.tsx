@@ -38,13 +38,13 @@ import { JourneyPanel } from "@/components/results/journey-panel";
 import { DebriefPanel } from "@/components/coach/debrief-panel";
 import type { DebriefPlan } from "@/lib/coach/debrief-plan";
 import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Props = {
   sessionId: string;
   durationMs: number;
   stats: PracticeStats;
   baseline: PracticeBaseline;
-  sectionTitles: Record<string, string>;
   aiNote: string;
   journey?: Journey;
   initialPlan?: DebriefPlan | null;
@@ -72,7 +72,6 @@ export function PracticeResultsView({
   durationMs,
   stats,
   baseline,
-  sectionTitles,
   aiNote,
   journey,
   initialPlan,
@@ -83,7 +82,7 @@ export function PracticeResultsView({
       const b = baseline.bySection?.[s.code];
       return {
         code: s.code,
-        title: sectionTitles[s.code],
+        title: formatSectionDisplayLabel(s.code),
         total: s.total,
         correct: s.correct,
         accuracy: s.accuracy,
@@ -124,11 +123,7 @@ export function PracticeResultsView({
       <KpiGrid stats={stats} />
       <AINotePanel note={aiNote} />
       {journey && <JourneyPanel journey={journey} currentSessionId={sessionId} />}
-      <ComparisonPanel
-        stats={stats}
-        baseline={baseline}
-        sectionTitles={sectionTitles}
-      />
+      <ComparisonPanel stats={stats} baseline={baseline} />
 
       <div className="grid lg:grid-cols-2 gap-4">
         <DifficultyCard stats={stats} />
@@ -140,11 +135,7 @@ export function PracticeResultsView({
         <RecoveryCard stats={stats} />
       </div>
 
-      <SectionBreakdown
-        stats={stats}
-        baseline={baseline}
-        sectionTitles={sectionTitles}
-      />
+      <SectionBreakdown stats={stats} baseline={baseline} />
 
       <QuestionReview review={stats.review} />
     </div>
@@ -491,11 +482,9 @@ function AINotePanel({ note }: { note: string }) {
 function ComparisonPanel({
   stats,
   baseline,
-  sectionTitles,
 }: {
   stats: PracticeStats;
   baseline: PracticeBaseline;
-  sectionTitles: Record<string, string>;
 }) {
   // Build delta rows for sections with both data points.
   type Row = {
@@ -512,7 +501,7 @@ function ComparisonPanel({
     const delta = before == null ? null : s.accuracy - before;
     return {
       code: s.code,
-      title: sectionTitles[s.code] ?? s.code,
+      title: formatSectionDisplayLabel(s.code),
       practice: s.accuracy,
       before,
       delta,
@@ -662,10 +651,10 @@ function DeltaBar({
   const dir = row.delta == null ? 0 : Math.sign(row.delta);
 
   return (
-    <div className="grid grid-cols-[64px_1fr_auto] items-center gap-3 py-1">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] items-center gap-3 py-1">
       <div className="flex items-center gap-2 min-w-0">
-        <Badge variant="outline" className="text-[10px]">
-          {row.code}
+        <Badge variant="outline" className="text-[10px] text-left whitespace-normal font-normal leading-snug">
+          {formatSectionDisplayLabel(row.code)}
         </Badge>
       </div>
 
@@ -1076,11 +1065,9 @@ function MiniStat({
 function SectionBreakdown({
   stats,
   baseline,
-  sectionTitles,
 }: {
   stats: PracticeStats;
   baseline: PracticeBaseline;
-  sectionTitles: Record<string, string>;
 }) {
   return (
     <Card>
@@ -1091,7 +1078,6 @@ function SectionBreakdown({
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           {stats.bySection.map((s) => {
-            const title = sectionTitles[s.code] ?? "";
             const b = baseline.bySection[s.code];
             const delta = b?.accuracy != null ? s.accuracy - b.accuracy : null;
             const tone =
@@ -1107,13 +1093,10 @@ function SectionBreakdown({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px]">
-                        {s.code}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-[10px] text-left whitespace-normal font-normal leading-snug">
+                        {formatSectionDisplayLabel(s.code)}
                       </Badge>
-                      <span className="text-sm font-medium text-ink truncate">
-                        {title}
-                      </span>
                     </div>
                     <div className="mt-1 text-xs text-ink-muted">
                       {s.correct}/{s.total} first try
@@ -1258,8 +1241,8 @@ function ReviewRow({ item }: { item: PracticeReviewItem }) {
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted flex items-center gap-2 flex-wrap">
             <span>Q{item.index + 1}</span>
-            <Badge variant="outline" className="text-[10px]">
-              {q.section_code}
+            <Badge variant="outline" className="text-[10px] text-left whitespace-normal font-normal leading-snug max-w-[min(100%,18rem)]">
+              {formatSectionDisplayLabel(q.section_code)}
             </Badge>
             <span className="capitalize">· {q.level}</span>
             {item.coached && (

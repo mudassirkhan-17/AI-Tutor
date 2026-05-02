@@ -7,6 +7,7 @@ import {
 } from "@/lib/assessment/coverage";
 import { hasFinishedPractice } from "@/lib/practice/completion";
 import { SECTIONS } from "@/lib/constants";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
 
 export default async function DashboardPage() {
@@ -101,7 +102,7 @@ function getNextBestAction(
   if (stats.topWeaknesses.length > 0) {
     const w = stats.topWeaknesses[0];
     return {
-      title: `Drill ${w.code}: ${w.title} — you're at ${w.accuracy}%.`,
+      title: `Drill ${formatSectionDisplayLabel(w.code)} — you're at ${w.accuracy}%.`,
       detail: "Jump into a Practice session focused on raising this weak spot.",
       cta: "Practice now",
       href: "/practice",

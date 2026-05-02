@@ -6,7 +6,6 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { buildSummary } from "@/lib/assessment/summary";
-import { SECTIONS } from "@/lib/constants";
 import { OverallAssessmentPdf } from "@/lib/pdf/overall-assessment-pdf";
 import type { DocumentProps } from "@react-pdf/renderer";
 
@@ -112,10 +111,6 @@ export async function GET(_req: Request) {
       for (const r of rows ?? []) conceptTitles[r.id] = r.title;
     }
 
-    const sectionTitles = Object.fromEntries(
-      SECTIONS.map((s) => [s.code, s.title]),
-    );
-
     const generatedAt = new Date().toLocaleDateString("en-US", {
       weekday: "short",
       year: "numeric",
@@ -128,7 +123,6 @@ export async function GET(_req: Request) {
       summary,
       totalSessions: sessions.length,
       totalDurationMs,
-      sectionTitles,
       conceptTitles,
       tutorLetter,
       generatedAt,

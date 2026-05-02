@@ -76,7 +76,6 @@ export default async function MistakesResults({
       durationMs={session.duration_ms ?? 0}
       stats={stats}
       journey={journey}
-      sectionTitles={sectionTitles}
       aiNote={aiNote}
       initialPlan={storedPlan}
       initialPlanCommitted={storedCommitted}

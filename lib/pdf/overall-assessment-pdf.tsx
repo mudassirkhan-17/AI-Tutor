@@ -10,6 +10,7 @@ import {
   Rect,
 } from "@react-pdf/renderer";
 import type { AssessmentSummary } from "@/lib/assessment/summary";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ─── Brand colours ─── */
 const C = {
@@ -490,7 +491,6 @@ export interface OverallAssessmentPdfProps {
   summary: AssessmentSummary;
   totalSessions: number;
   totalDurationMs: number;
-  sectionTitles: Record<string, string>;
   conceptTitles: Record<string, string>;
   tutorLetter: string | null;
   generatedAt?: string;
@@ -501,7 +501,6 @@ export function OverallAssessmentPdf({
   summary,
   totalSessions,
   totalDurationMs,
-  sectionTitles,
   conceptTitles,
   tutorLetter,
   generatedAt,
@@ -606,7 +605,6 @@ export function OverallAssessmentPdf({
           <View style={[s.comparisonTable, { marginBottom: 8 }]}>
             <View style={s.tableHeader}>
               <View style={s.colGroup}><Text style={[s.tableHeaderCell, { color: C.national }]}>National</Text></View>
-              <View style={s.colCode} />
               <View style={s.colName}><Text style={s.tableHeaderCell}>Section</Text></View>
               <View style={s.colBar}><Text style={s.tableHeaderCell}>Breakdown</Text></View>
               <View style={s.colPct}><Text style={s.tableHeaderCell}>Accuracy</Text></View>
@@ -614,7 +612,6 @@ export function OverallAssessmentPdf({
               <View style={s.colMiss}><Text style={s.tableHeaderCell}>✗</Text></View>
             </View>
             {nationalSections.map((sec, i) => {
-              const title = sectionTitles[sec.code] ?? sec.code;
               const color = accuracyColor(sec.accuracy);
               const isLast = i === nationalSections.length - 1;
               return (
@@ -622,11 +619,8 @@ export function OverallAssessmentPdf({
                   <View style={s.colGroup}>
                     <Text style={[s.cellGroup, { backgroundColor: "#DDE8F5", color: C.national }]}>Nat</Text>
                   </View>
-                  <View style={s.colCode}>
-                    <Text style={s.cellCode}>{sec.code}</Text>
-                  </View>
                   <View style={s.colName}>
-                    <Text style={s.cellName}>{title}</Text>
+                    <Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text>
                   </View>
                   <View style={s.colBar}>
                     <StackedBar mastered={sec.mastered} soft={sec.soft_miss} hard={sec.hard_miss} total={sec.total} />
@@ -649,7 +643,6 @@ export function OverallAssessmentPdf({
           <View style={[s.comparisonTable, { marginBottom: 16 }]}>
             <View style={s.tableHeader}>
               <View style={s.colGroup}><Text style={[s.tableHeaderCell, { color: C.state }]}>State</Text></View>
-              <View style={s.colCode} />
               <View style={s.colName}><Text style={s.tableHeaderCell}>Section</Text></View>
               <View style={s.colBar}><Text style={s.tableHeaderCell}>Breakdown</Text></View>
               <View style={s.colPct}><Text style={s.tableHeaderCell}>Accuracy</Text></View>
@@ -657,7 +650,6 @@ export function OverallAssessmentPdf({
               <View style={s.colMiss}><Text style={s.tableHeaderCell}>✗</Text></View>
             </View>
             {stateSections.map((sec, i) => {
-              const title = sectionTitles[sec.code] ?? sec.code;
               const color = accuracyColor(sec.accuracy);
               const isLast = i === stateSections.length - 1;
               return (
@@ -665,11 +657,8 @@ export function OverallAssessmentPdf({
                   <View style={s.colGroup}>
                     <Text style={[s.cellGroup, { backgroundColor: "#EDE5F5", color: C.state }]}>SC</Text>
                   </View>
-                  <View style={s.colCode}>
-                    <Text style={s.cellCode}>{sec.code}</Text>
-                  </View>
                   <View style={s.colName}>
-                    <Text style={s.cellName}>{title}</Text>
+                    <Text style={s.cellName}>{formatSectionDisplayLabel(sec.code)}</Text>
                   </View>
                   <View style={s.colBar}>
                     <StackedBar mastered={sec.mastered} soft={sec.soft_miss} hard={sec.hard_miss} total={sec.total} />
@@ -771,8 +760,9 @@ export function OverallAssessmentPdf({
                 .slice(0, 4)
                 .map((sec, i, arr) => (
                   <View key={sec.code} style={[s.highlightRow, i === arr.length - 1 ? s.highlightRowLast : {}]}>
-                    <Text style={s.highlightCode}>{sec.code}</Text>
-                    <Text style={s.highlightName}>{sectionTitles[sec.code] ?? sec.code}</Text>
+                    <Text style={[s.highlightName, { flex: 1 }]}>
+                      {formatSectionDisplayLabel(sec.code)}
+                    </Text>
                     <Text style={[s.highlightPct, { color: C.success }]}>{sec.accuracy}%</Text>
                   </View>
                 ))}
@@ -787,8 +777,9 @@ export function OverallAssessmentPdf({
                 .slice(0, 4)
                 .map((sec, i, arr) => (
                   <View key={sec.code} style={[s.highlightRow, i === arr.length - 1 ? s.highlightRowLast : {}]}>
-                    <Text style={s.highlightCode}>{sec.code}</Text>
-                    <Text style={s.highlightName}>{sectionTitles[sec.code] ?? sec.code}</Text>
+                    <Text style={[s.highlightName, { flex: 1 }]}>
+                      {formatSectionDisplayLabel(sec.code)}
+                    </Text>
                     <Text style={[s.highlightPct, { color: accuracyColor(sec.accuracy) }]}>{sec.accuracy}%</Text>
                   </View>
                 ))}
@@ -808,7 +799,9 @@ export function OverallAssessmentPdf({
                       <View style={s.conceptNum}>
                         <Text style={s.conceptNumText}>{i + 1}</Text>
                       </View>
-                      <Text style={s.conceptSection}>{c.section_code}</Text>
+                      <Text style={s.conceptSection}>
+                        {formatSectionDisplayLabel(c.section_code)}
+                      </Text>
                       <Text style={s.conceptTitle}>{title}</Text>
                       <Text style={[s.conceptAccuracy, { color: accuracyColor(acc) }]}>
                         {acc}% ({c.mastered}/{c.total})

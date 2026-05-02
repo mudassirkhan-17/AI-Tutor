@@ -28,6 +28,7 @@ import type {
   VerdictTier,
 } from "@/lib/final/report";
 import { FINAL_PASS_PCT } from "@/lib/final/pick-questions";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export type ReviewAttempt = {
   question: QuestionRow;
@@ -198,14 +199,10 @@ export function FinalReport({
                     className="rounded-xl border border-border px-4 py-3"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Badge variant="outline">{s.code}</Badge>
-                        <span className="text-sm text-ink truncate max-w-[200px] md:max-w-[320px]">
-                          {s.title}
-                        </span>
-                        <span className="text-xs text-ink-muted shrink-0">
-                          ({s.group === "National" ? "Nat." : "SC"})
-                        </span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug">
+                          {formatSectionDisplayLabel(s.code)}
+                        </Badge>
                       </div>
                       <div className="ml-auto flex items-center gap-3">
                         <span className="text-sm text-ink-muted tabular-nums">
@@ -575,7 +572,6 @@ function ReviewRow({
   const { open } = useChatSheet();
   const [expanded, setExpanded] = React.useState(false);
   const { question: q, user_answer, is_correct } = attempt;
-  const portion = q.section_code.startsWith("A") ? "Nat." : "SC";
   const map: Record<string, string> = {
     A: q.option_a,
     B: q.option_b,
@@ -603,7 +599,7 @@ function ReviewRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted">
-            Q{index + 1} · {q.section_code} · {portion} · {q.level}
+            Q{index + 1} · {formatSectionDisplayLabel(q.section_code)} · {q.level}
           </div>
           <div className="text-sm text-ink truncate">{q.prompt}</div>
         </div>

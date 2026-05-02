@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SECTIONS } from "@/lib/constants";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 import { createClient } from "@/lib/supabase/server";
 import { getAssessmentCoverage } from "@/lib/assessment/coverage";
 import { PracticeStartPicker } from "@/components/practice/practice-start-picker";
@@ -103,8 +104,8 @@ function PracticeLocked({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink">
-                      {s.code} · {s.title}
+                    <div className="text-sm font-medium text-ink leading-snug">
+                      {formatSectionDisplayLabel(s.code)}
                     </div>
                     <div className="text-xs text-ink-muted">
                       {done ? "Assessed" : "Not yet assessed"}
