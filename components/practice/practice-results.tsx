@@ -23,12 +23,14 @@ import {
   GraduationCap,
   ArrowRight,
   Zap,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 import type { PracticeStats, PracticeReviewItem } from "@/lib/practice/results";
 import type { PracticeBaseline } from "@/lib/practice/baseline";
 import type { Journey } from "@/lib/journey/load";
@@ -36,13 +38,13 @@ import { JourneyPanel } from "@/components/results/journey-panel";
 import { DebriefPanel } from "@/components/coach/debrief-panel";
 import type { DebriefPlan } from "@/lib/coach/debrief-plan";
 import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Props = {
   sessionId: string;
   durationMs: number;
   stats: PracticeStats;
   baseline: PracticeBaseline;
-  sectionTitles: Record<string, string>;
   aiNote: string;
   journey?: Journey;
   initialPlan?: DebriefPlan | null;
@@ -70,7 +72,6 @@ export function PracticeResultsView({
   durationMs,
   stats,
   baseline,
-  sectionTitles,
   aiNote,
   journey,
   initialPlan,
@@ -81,7 +82,7 @@ export function PracticeResultsView({
       const b = baseline.bySection?.[s.code];
       return {
         code: s.code,
-        title: sectionTitles[s.code],
+        title: formatSectionDisplayLabel(s.code),
         total: s.total,
         correct: s.correct,
         accuracy: s.accuracy,
@@ -113,7 +114,7 @@ export function PracticeResultsView({
 
   return (
     <div className="space-y-6">
-      <Hero stats={stats} durationMs={durationMs} />
+      <Hero stats={stats} durationMs={durationMs} sessionId={sessionId} />
       <DebriefPanel
         snapshot={debriefSnapshot}
         initialPlan={initialPlan}
@@ -122,11 +123,7 @@ export function PracticeResultsView({
       <KpiGrid stats={stats} />
       <AINotePanel note={aiNote} />
       {journey && <JourneyPanel journey={journey} currentSessionId={sessionId} />}
-      <ComparisonPanel
-        stats={stats}
-        baseline={baseline}
-        sectionTitles={sectionTitles}
-      />
+      <ComparisonPanel stats={stats} baseline={baseline} />
 
       <div className="grid lg:grid-cols-2 gap-4">
         <DifficultyCard stats={stats} />
@@ -138,11 +135,7 @@ export function PracticeResultsView({
         <RecoveryCard stats={stats} />
       </div>
 
-      <SectionBreakdown
-        stats={stats}
-        baseline={baseline}
-        sectionTitles={sectionTitles}
-      />
+      <SectionBreakdown stats={stats} baseline={baseline} />
 
       <QuestionReview review={stats.review} />
     </div>
@@ -153,7 +146,7 @@ export function PracticeResultsView({
 /*  HERO                                                                  */
 /* ===================================================================== */
 
-function Hero({ stats, durationMs }: { stats: PracticeStats; durationMs: number }) {
+function Hero({ stats, durationMs, sessionId }: { stats: PracticeStats; durationMs: number; sessionId: string }) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
@@ -218,6 +211,7 @@ function Hero({ stats, durationMs }: { stats: PracticeStats; durationMs: number 
                 </Link>
               </Button>
             )}
+            <DownloadPdfButton sessionId={sessionId} />
           </div>
         </div>
       </div>
@@ -488,11 +482,9 @@ function AINotePanel({ note }: { note: string }) {
 function ComparisonPanel({
   stats,
   baseline,
-  sectionTitles,
 }: {
   stats: PracticeStats;
   baseline: PracticeBaseline;
-  sectionTitles: Record<string, string>;
 }) {
   // Build delta rows for sections with both data points.
   type Row = {
@@ -509,7 +501,7 @@ function ComparisonPanel({
     const delta = before == null ? null : s.accuracy - before;
     return {
       code: s.code,
-      title: sectionTitles[s.code] ?? s.code,
+      title: formatSectionDisplayLabel(s.code),
       practice: s.accuracy,
       before,
       delta,
@@ -659,10 +651,10 @@ function DeltaBar({
   const dir = row.delta == null ? 0 : Math.sign(row.delta);
 
   return (
-    <div className="grid grid-cols-[64px_1fr_auto] items-center gap-3 py-1">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] items-center gap-3 py-1">
       <div className="flex items-center gap-2 min-w-0">
-        <Badge variant="outline" className="text-[10px]">
-          {row.code}
+        <Badge variant="outline" className="text-[10px] text-left whitespace-normal font-normal leading-snug">
+          {formatSectionDisplayLabel(row.code)}
         </Badge>
       </div>
 
@@ -1073,11 +1065,9 @@ function MiniStat({
 function SectionBreakdown({
   stats,
   baseline,
-  sectionTitles,
 }: {
   stats: PracticeStats;
   baseline: PracticeBaseline;
-  sectionTitles: Record<string, string>;
 }) {
   return (
     <Card>
@@ -1088,7 +1078,6 @@ function SectionBreakdown({
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           {stats.bySection.map((s) => {
-            const title = sectionTitles[s.code] ?? "";
             const b = baseline.bySection[s.code];
             const delta = b?.accuracy != null ? s.accuracy - b.accuracy : null;
             const tone =
@@ -1104,13 +1093,10 @@ function SectionBreakdown({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px]">
-                        {s.code}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-[10px] text-left whitespace-normal font-normal leading-snug">
+                        {formatSectionDisplayLabel(s.code)}
                       </Badge>
-                      <span className="text-sm font-medium text-ink truncate">
-                        {title}
-                      </span>
                     </div>
                     <div className="mt-1 text-xs text-ink-muted">
                       {s.correct}/{s.total} first try
@@ -1255,8 +1241,8 @@ function ReviewRow({ item }: { item: PracticeReviewItem }) {
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted flex items-center gap-2 flex-wrap">
             <span>Q{item.index + 1}</span>
-            <Badge variant="outline" className="text-[10px]">
-              {q.section_code}
+            <Badge variant="outline" className="text-[10px] text-left whitespace-normal font-normal leading-snug max-w-[min(100%,18rem)]">
+              {formatSectionDisplayLabel(q.section_code)}
             </Badge>
             <span className="capitalize">· {q.level}</span>
             {item.coached && (
@@ -1328,6 +1314,45 @@ function ReviewRow({ item }: { item: PracticeReviewItem }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── Download PDF Button ─── */
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/report/practice/${sessionId}/pdf`);
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `practice-report-${sessionId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      toast.error("Could not generate PDF. Please try again.");
+      console.error("[Practice PDF download]", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      onClick={handleDownload}
+      disabled={loading}
+      className="gap-1.5"
+    >
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
   );
 }
 

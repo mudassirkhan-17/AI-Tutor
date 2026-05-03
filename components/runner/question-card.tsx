@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { QuestionRow } from "@/lib/supabase/types";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export type QuestionCardProps = {
   question: QuestionRow;
@@ -84,7 +85,9 @@ export function QuestionCard({
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 text-sm text-ink-muted">
-          <Badge variant="outline">{question.section_code}</Badge>
+          <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug max-w-[min(100%,22rem)]">
+            {formatSectionDisplayLabel(question.section_code)}
+          </Badge>
           <span>·</span>
           <span className="capitalize">{question.level}</span>
         </div>

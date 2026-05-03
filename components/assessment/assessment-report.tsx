@@ -22,6 +22,7 @@ import {
   Hourglass,
   Trophy,
   Activity,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,8 @@ import type {
   RawAttempt,
 } from "@/lib/assessment/summary";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 // SC salesperson exam pass line.
 const PASS_THRESHOLD = 70;
@@ -102,7 +105,6 @@ export function AssessmentReport({
   lengthLabel,
   coverage,
 }: Props) {
-  void sessionId;
   const strict = summary.accuracy_pct;
   const reach = summary.effective_pct;
   const lengthText =
@@ -115,9 +117,7 @@ export function AssessmentReport({
           : null;
 
   const nextSection = coverage.nextSection;
-  const nextTitle = nextSection
-    ? sectionTitles[nextSection] ?? ""
-    : "";
+  const nextLabel = nextSection ? formatSectionDisplayLabel(nextSection) : "";
   const continueHref = coverage.missing.length
     ? `/assessment?sections=${coverage.missing.join(",")}`
     : "/assessment";
@@ -125,7 +125,7 @@ export function AssessmentReport({
   const primaryCtaLabel = coverage.allCovered
     ? "Start practice"
     : nextSection
-      ? `Continue with ${nextSection}`
+      ? `Continue: ${nextLabel}`
       : "Continue assessment";
 
   return (
@@ -166,6 +166,7 @@ export function AssessmentReport({
                   <RotateCcw className="h-4 w-4" /> Retake
                 </Link>
               </Button>
+              <DownloadPdfButton sessionId={sessionId} allCovered={coverage.allCovered} />
             </div>
           </div>
 
@@ -196,7 +197,7 @@ export function AssessmentReport({
             coverage={coverage}
             continueHref={continueHref}
             nextSection={nextSection}
-            nextTitle={nextTitle}
+            nextLabel={nextLabel}
           />
         </div>
       </section>
@@ -279,7 +280,7 @@ export function AssessmentReport({
               ) : (
                 <Button asChild size="sm" variant="soft">
                   <Link href={continueHref}>
-                    {nextSection ? `Continue with ${nextSection}` : "Continue assessment"}
+                    {nextSection ? `Continue: ${nextLabel}` : "Continue assessment"}
                   </Link>
                 </Button>
               )}
@@ -348,12 +349,12 @@ function CoverageNotice({
   coverage,
   continueHref,
   nextSection,
-  nextTitle,
+  nextLabel,
 }: {
   coverage: Coverage;
   continueHref: string;
   nextSection: string | null;
-  nextTitle: string;
+  nextLabel: string;
 }) {
   const total = coverage.covered.length + coverage.missing.length;
   const done = coverage.covered.length;
@@ -390,8 +391,7 @@ function CoverageNotice({
         {nextSection && (
           <Button asChild size="sm" variant="outline">
             <Link href={continueHref}>
-              Continue with {nextSection}
-              {nextTitle ? `: ${nextTitle}` : ""}
+              Continue: {nextLabel}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
@@ -749,11 +749,12 @@ function SectionGroup({
 
 function SectionRow({
   row,
-  title,
+  title: _title,
 }: {
   row: AssessmentSummary["sections"][number];
   title?: string;
 }) {
+  void _title;
   const s = row;
   const reach = s.total
     ? Math.round((100 * (s.mastered + s.soft_miss)) / s.total)
@@ -761,13 +762,10 @@ function SectionRow({
   return (
     <div className="rounded-xl border border-border bg-surface p-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <Badge variant="outline" className="shrink-0">
-            {s.code}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug">
+            {formatSectionDisplayLabel(s.code)}
           </Badge>
-          <span className="text-sm font-medium text-ink truncate">
-            {title ?? s.code}
-          </span>
         </div>
         <div className="flex items-center gap-3 shrink-0 text-xs">
           <span className="text-ink-muted">
@@ -1007,11 +1005,11 @@ function TimeInsightPanel({
           <div className="mb-4 rounded-xl border border-border bg-elevated/40 p-3 text-xs text-ink-muted">
             Slowest:{" "}
             <span className="text-ink font-medium">
-              {slowest.code} · {sectionTitles[slowest.code] ?? ""}
+              {formatSectionDisplayLabel(slowest.code)}
             </span>{" "}
             at {formatSecs(slowest.avg_time_ms)}/Q. Fastest:{" "}
             <span className="text-ink font-medium">
-              {fastest.code} · {sectionTitles[fastest.code] ?? ""}
+              {formatSectionDisplayLabel(fastest.code)}
             </span>{" "}
             at {formatSecs(fastest.avg_time_ms)}/Q.
           </div>
@@ -1076,8 +1074,8 @@ function TimeRow({
   return (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
       <div className="flex items-center gap-2 min-w-0 w-[10rem]">
-        <Badge variant="outline" className="shrink-0">
-          {row.code}
+        <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug shrink-0 max-w-[11rem]">
+          {formatSectionDisplayLabel(row.code)}
         </Badge>
         <span className="text-xs text-ink-muted truncate">{title}</span>
       </div>
@@ -1253,7 +1251,7 @@ function SectionRadarSvg({
               textAnchor="middle"
               dominantBaseline="middle"
             >
-              {s.code}
+              {formatSectionDisplayLabel(s.code)}
             </text>
           );
         })}
@@ -1309,7 +1307,7 @@ function ConceptRow({
         <div className="min-w-0">
           <div className="font-medium text-ink truncate">{niceTitle}</div>
           <div className="text-xs text-ink-muted truncate">
-            {concept.section_code} · {concept.mastered}/{concept.total} clean
+            {formatSectionDisplayLabel(concept.section_code)} · {concept.mastered}/{concept.total} clean
             {concept.hard_miss > 0 && ` · ${concept.hard_miss} missed twice`}
             {concept.soft_miss > 0 && ` · ${concept.soft_miss} recovered`}
           </div>
@@ -1399,7 +1397,7 @@ function ReviewRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted">
-            Q{index + 1} · {q.section_code} · {friendlyLabel}
+            Q{index + 1} · {formatSectionDisplayLabel(q.section_code)} · {friendlyLabel}
           </div>
           <div className="text-sm text-ink truncate">{q.prompt}</div>
         </div>
@@ -1457,5 +1455,71 @@ function ReviewRow({
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── Download PDF Button ─── */
+function DownloadPdfButton({
+  sessionId,
+  allCovered,
+}: {
+  sessionId: string;
+  allCovered: boolean;
+}) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      /* When all 12 sections are covered, download the comprehensive
+         overall report that combines data from every session. */
+      const url = allCovered
+        ? "/api/report/assessment/overall/pdf"
+        : `/api/report/assessment/${sessionId}/pdf`;
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        const msg =
+          errBody && typeof errBody === "object" && "error" in errBody
+            ? String((errBody as { error?: string }).error)
+            : "Failed to generate PDF";
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = allCovered
+        ? "overall-assessment-report.pdf"
+        : `assessment-report-${sessionId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not generate PDF.";
+      toast.error(msg);
+      console.error("[PDF download]", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      variant={allCovered ? "default" : "outline"}
+      onClick={handleDownload}
+      disabled={loading}
+      className="gap-1.5"
+    >
+      <Download className="h-4 w-4" />
+      {loading
+        ? "Generating…"
+        : allCovered
+          ? "Download Overall Report"
+          : "Download PDF"}
+    </Button>
   );
 }

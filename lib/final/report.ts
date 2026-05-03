@@ -1,4 +1,5 @@
 import { SECTIONS } from "@/lib/constants";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 import { FINAL_PASS_PCT } from "@/lib/final/pick-questions";
 
 export type AttemptForReport = {
@@ -118,13 +119,13 @@ export function buildFinalReport({
     .filter((s) => s.group === "National" && s.total >= 3)
     .sort((a, b) => a.accuracyPct - b.accuracyPct)
     .slice(0, 2)
-    .map((s) => `${s.code} ${s.title}`);
+    .map((s) => formatSectionDisplayLabel(s.code));
 
   const stateWeakest = sections
     .filter((s) => s.group === "State" && s.total >= 3)
     .sort((a, b) => a.accuracyPct - b.accuracyPct)
     .slice(0, 2)
-    .map((s) => `${s.code} ${s.title}`);
+    .map((s) => formatSectionDisplayLabel(s.code));
 
   const verdict = buildVerdict({
     nationalPct,

@@ -83,7 +83,6 @@ export default async function PracticeResults({
       durationMs={session.duration_ms ?? 0}
       stats={stats}
       baseline={baseline}
-      sectionTitles={sectionTitles}
       aiNote={aiNote}
       journey={journey}
       initialPlan={storedPlan}

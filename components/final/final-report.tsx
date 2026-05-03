@@ -14,18 +14,21 @@ import {
   Calendar,
   Compass,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 import type { QuestionRow } from "@/lib/supabase/types";
 import type {
   FinalReport as FinalReportData,
   VerdictTier,
 } from "@/lib/final/report";
 import { FINAL_PASS_PCT } from "@/lib/final/pick-questions";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export type ReviewAttempt = {
   question: QuestionRow;
@@ -49,7 +52,42 @@ function band(p: number, passPct: number) {
   return { bar: "bg-danger", text: "text-danger" };
 }
 
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/report/final-test/${sessionId}/pdf`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body?.error ?? "PDF generation failed. Please try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `final-test-report-${sessionId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Could not download PDF. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" onClick={handleDownload} disabled={loading}>
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
+  );
+}
+
 export function FinalReport({
+  sessionId,
   durationMs,
   passPct,
   report,
@@ -101,6 +139,7 @@ export function FinalReport({
                 Final overview
               </Link>
             </Button>
+            <DownloadPdfButton sessionId={sessionId} />
           </div>
         </div>
       </section>
@@ -112,7 +151,7 @@ export function FinalReport({
       <div className="grid gap-4 md:grid-cols-2">
         <PortionCard
           label="National portion"
-          subtitle="Sections A1–A6"
+          subtitle="6 National sections"
           correct={report.nationalCorrect}
           total={report.nationalTotal}
           accuracyPct={report.nationalPct}
@@ -122,7 +161,7 @@ export function FinalReport({
         />
         <PortionCard
           label="South Carolina portion"
-          subtitle="Sections B1–B6"
+          subtitle="6 State sections"
           correct={report.stateCorrect}
           total={report.stateTotal}
           accuracyPct={report.statePct}
@@ -160,14 +199,10 @@ export function FinalReport({
                     className="rounded-xl border border-border px-4 py-3"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Badge variant="outline">{s.code}</Badge>
-                        <span className="text-sm text-ink truncate max-w-[200px] md:max-w-[320px]">
-                          {s.title}
-                        </span>
-                        <span className="text-xs text-ink-muted shrink-0">
-                          ({s.group === "National" ? "Nat." : "SC"})
-                        </span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug">
+                          {formatSectionDisplayLabel(s.code)}
+                        </Badge>
                       </div>
                       <div className="ml-auto flex items-center gap-3">
                         <span className="text-sm text-ink-muted tabular-nums">
@@ -537,7 +572,6 @@ function ReviewRow({
   const { open } = useChatSheet();
   const [expanded, setExpanded] = React.useState(false);
   const { question: q, user_answer, is_correct } = attempt;
-  const portion = q.section_code.startsWith("A") ? "Nat." : "SC";
   const map: Record<string, string> = {
     A: q.option_a,
     B: q.option_b,
@@ -565,7 +599,7 @@ function ReviewRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted">
-            Q{index + 1} · {q.section_code} · {portion} · {q.level}
+            Q{index + 1} · {formatSectionDisplayLabel(q.section_code)} · {q.level}
           </div>
           <div className="text-sm text-ink truncate">{q.prompt}</div>
         </div>

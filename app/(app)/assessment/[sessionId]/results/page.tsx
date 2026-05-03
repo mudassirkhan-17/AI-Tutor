@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AssessmentReport } from "@/components/assessment/assessment-report";
-import { buildSummary } from "@/lib/assessment/summary";
+import {
+  assessmentSummaryNeedsRefresh,
+  buildSummary,
+} from "@/lib/assessment/summary";
 import type { AssessmentSummary, RawAttempt } from "@/lib/assessment/summary";
 import { SECTIONS } from "@/lib/constants";
 import { getAssessmentCoverage } from "@/lib/assessment/coverage";
@@ -27,19 +30,13 @@ export default async function AssessmentResults({
   if (!session) redirect("/dashboard");
 
   const config = (session.config ?? {}) as Record<string, unknown>;
-  let summary: AssessmentSummary | null =
+  const cachedSummary =
     (config.summary as AssessmentSummary | undefined) ?? null;
   const tutorLetter: string | null =
     (config.tutor_letter as string | undefined) ?? null;
 
-  // Rebuild summary on the fly if it wasn't stored OR the cached one is from
-  // an older shape (missing the new time/predicted fields). This keeps old
-  // sessions visible without a migration.
-  if (
-    !summary ||
-    typeof summary.total_time_ms !== "number" ||
-    !summary.predicted
-  ) {
+  let summary: AssessmentSummary;
+  if (assessmentSummaryNeedsRefresh(cachedSummary)) {
     const { data: attempts } = await supabase
       .from("attempts")
       .select(
@@ -51,6 +48,9 @@ export default async function AssessmentResults({
     summary = buildSummary(
       ((attempts ?? []) as unknown) as Parameters<typeof buildSummary>[0],
     );
+  } else {
+    /* needsRefresh(null) is true, so here cache is a complete AssessmentSummary */
+    summary = cachedSummary as AssessmentSummary;
   }
 
   // Pretty concept titles

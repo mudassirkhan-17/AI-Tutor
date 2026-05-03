@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 import type { SectionMastery } from "@/lib/kpi/stats";
 
 export function StrengthsWeaknesses({
@@ -51,8 +52,8 @@ function Column({
           {items.map((s) => (
             <div key={s.code}>
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-ink">
-                  {s.code} · {s.title}
+                <span className="font-medium text-ink leading-snug">
+                  {formatSectionDisplayLabel(s.code)}
                 </span>
                 <span className="tabular-nums text-ink-muted">{s.accuracy}%</span>
               </div>

@@ -18,6 +18,7 @@ import {
 import * as React from "react";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import type { QuestionRow } from "@/lib/supabase/types";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export type AttemptSummary = {
   question: QuestionRow;
@@ -219,7 +220,7 @@ function ReviewRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted">
-            Q{index + 1} · {q.section_code}
+            Q{index + 1} · {formatSectionDisplayLabel(q.section_code)}
           </div>
           <div className="text-sm text-ink truncate">{q.prompt}</div>
         </div>

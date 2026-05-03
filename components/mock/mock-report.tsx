@@ -21,18 +21,21 @@ import {
   Target,
   Timer,
   Flame,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { toast } from "sonner";
 import type { QuestionRow } from "@/lib/supabase/types";
 import type { Journey } from "@/lib/journey/load";
 import { JourneyPanel } from "@/components/results/journey-panel";
 import { DebriefPanel } from "@/components/coach/debrief-panel";
 import type { DebriefPlan } from "@/lib/coach/debrief-plan";
 import { rankSections, enrichSections } from "@/lib/coach/build-snapshot";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ------------------------------- types ---------------------------------- */
 
@@ -98,6 +101,42 @@ type Props = {
   initialPlan?: DebriefPlan | null;
   initialPlanCommitted?: boolean;
 };
+
+/* ----------------------------- download btn ----------------------------- */
+
+function DownloadPdfButton({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/report/mock-exam/${sessionId}/pdf`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body?.error ?? "PDF generation failed. Please try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mock-exam-report-${sessionId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Could not download PDF. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" onClick={handleDownload} disabled={loading}>
+      <Download className="h-4 w-4" />
+      {loading ? "Generating…" : "Download PDF"}
+    </Button>
+  );
+}
 
 /* ------------------------------- helpers -------------------------------- */
 
@@ -221,6 +260,7 @@ export function MockReport({
                 Retake Mock
               </Link>
             </Button>
+            <DownloadPdfButton sessionId={sessionId} />
           </div>
         </div>
       </section>
@@ -266,14 +306,14 @@ export function MockReport({
           correct={nationalCorrect}
           total={nationalTotal}
           passPct={passPct}
-          hint="Sections A1–A6. The real exam has 80 here."
+          hint="National portion (6 sections). The real exam has 80 here."
         />
         <SubscoreGauge
           label="South Carolina"
           correct={stateCorrect}
           total={stateTotal}
           passPct={passPct}
-          hint="Sections B1–B6. The real exam has 40 here."
+          hint="South Carolina state portion (6 sections). The real exam has 40 here."
         />
       </div>
 
@@ -550,14 +590,10 @@ function SectionMatrixRow({
   return (
     <div className="rounded-xl border border-border px-4 py-3">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Badge variant="outline">{row.code}</Badge>
-          <span className="text-sm text-ink truncate max-w-[200px] md:max-w-[280px]">
-            {row.title}
-          </span>
-          <span className="text-xs text-ink-muted shrink-0">
-            ({row.group === "National" ? "Nat." : "SC"})
-          </span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug">
+            {formatSectionDisplayLabel(row.code)}
+          </Badge>
         </div>
         <div className="ml-auto flex items-center gap-3">
           {belowBar && (
@@ -939,7 +975,7 @@ function ReviewRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-muted">
-            Q{index + 1} · {q.section_code} · {q.level}
+            Q{index + 1} · {formatSectionDisplayLabel(q.section_code)} · {q.level}
           </div>
           <div className="text-sm text-ink truncate">{q.prompt}</div>
         </div>

@@ -6,7 +6,7 @@ import {
   type AssessmentCoverage,
 } from "@/lib/assessment/coverage";
 import { hasFinishedPractice } from "@/lib/practice/completion";
-import { SECTIONS } from "@/lib/constants";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
 
 export default async function DashboardPage() {
@@ -65,19 +65,17 @@ function getNextBestAction(
   }
   if (!coverage.allCovered) {
     const next = coverage.nextSection;
-    const nextTitle = next
-      ? SECTIONS.find((s) => s.code === next)?.title ?? ""
-      : "";
+    const nextLabel = next ? formatSectionDisplayLabel(next) : "";
     const continueHref = coverage.missing.length
       ? `/assessment?sections=${coverage.missing.join(",")}`
       : "/assessment";
     const left = coverage.missing.length;
     return {
       title: next
-        ? `Finish the assessment — ${next}: ${nextTitle} is next.`
+        ? `Finish the assessment — ${nextLabel} is next.`
         : "Finish the assessment to unlock Practice.",
       detail: `Practice adapts to your weak spots, but needs a baseline on every section first. ${left} section${left === 1 ? "" : "s"} to go.`,
-      cta: next ? `Continue with ${next}` : "Continue assessment",
+      cta: next ? `Continue: ${nextLabel}` : "Continue assessment",
       href: continueHref,
     };
   }
@@ -101,7 +99,7 @@ function getNextBestAction(
   if (stats.topWeaknesses.length > 0) {
     const w = stats.topWeaknesses[0];
     return {
-      title: `Drill ${w.code}: ${w.title} — you're at ${w.accuracy}%.`,
+      title: `Drill ${formatSectionDisplayLabel(w.code)} — you're at ${w.accuracy}%.`,
       detail: "Jump into a Practice session focused on raising this weak spot.",
       cta: "Practice now",
       href: "/practice",

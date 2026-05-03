@@ -15,7 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Sparkles, Send, X, Loader2, BookOpen } from "lucide-react";
 import type { ChatQuestionContext } from "./chat-sheet-provider";
+import { ChatMarkdown } from "./chat-markdown";
+import { VoiceInputButton } from "./voice-input-button";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 export function ChatSheet({
   open,
@@ -92,9 +95,9 @@ export function ChatSheet({
           <div className="px-6 pt-4">
             <div className="rounded-xl border border-border bg-elevated p-3 text-xs">
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <Badge variant="outline" className="gap-1">
-                  <BookOpen className="h-3 w-3" />
-                  {questionContext.section_code}
+                <Badge variant="outline" className="gap-1 text-left whitespace-normal font-normal leading-snug">
+                  <BookOpen className="h-3 w-3 shrink-0" />
+                  {formatSectionDisplayLabel(questionContext.section_code)}
                 </Badge>
                 <button
                   className="text-ink-muted hover:text-ink"
@@ -150,13 +153,17 @@ export function ChatSheet({
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
+                      "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
                       m.role === "user"
-                        ? "bg-primary text-primary-foreground"
+                        ? "whitespace-pre-wrap bg-primary text-primary-foreground"
                         : "bg-elevated border border-border text-ink",
                     )}
                   >
-                    {m.content}
+                    {m.role === "user" ? (
+                      m.content
+                    ) : (
+                      <ChatMarkdown content={m.content} />
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -180,6 +187,15 @@ export function ChatSheet({
             placeholder="Ask about a concept, a question, or request a quiz…"
             className="flex-1"
             autoFocus
+          />
+          <VoiceInputButton
+            disabled={isLoading}
+            onAppendTranscript={(t) =>
+              setInput((prev) => {
+                const base = prev.trimEnd();
+                return base ? `${base} ${t}` : t;
+              })
+            }
           />
           <Button type="submit" size="icon" disabled={!input.trim() || isLoading}>
             <Send className="h-4 w-4" />

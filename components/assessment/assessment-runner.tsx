@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn, pct } from "@/lib/utils";
 import type { QuestionRow, ResultLabel } from "@/lib/supabase/types";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 type Props = {
   sessionId: string;
@@ -107,26 +108,34 @@ export function AssessmentRunner({
     hinted: boolean,
   ) {
     const now = Date.now();
-    try {
-      await fetch("/api/attempts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          question_id: q.id,
-          mode: "assessment",
-          user_answer: answer,
-          is_correct: isCorrect,
-          hinted,
-          retried: attempt === 2,
-          time_spent_ms: Math.max(0, now - s.attemptStart),
-          attempt_number: attempt,
-          result_label: label,
-        }),
-      });
-    } catch (e) {
-      console.error("recordAttempt", e);
+    const body = JSON.stringify({
+      session_id: sessionId,
+      question_id: q.id,
+      mode: "assessment",
+      user_answer: answer,
+      is_correct: isCorrect,
+      hinted,
+      retried: attempt === 2,
+      time_spent_ms: Math.max(0, now - s.attemptStart),
+      attempt_number: attempt,
+      result_label: label,
+    });
+    let lastErr = "";
+    for (let tryIdx = 0; tryIdx < 4; tryIdx++) {
+      try {
+        const res = await fetch("/api/attempts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        });
+        if (res.ok) return;
+        lastErr = await res.text().catch(() => res.statusText);
+      } catch (e) {
+        lastErr = String(e);
+      }
+      await new Promise((r) => setTimeout(r, 120 * (tryIdx + 1)));
     }
+    console.error("[assessment] recordAttempt failed after retries", lastErr);
   }
 
   async function fetchHint(wrongLetter: "A" | "B" | "C" | "D" | null) {
@@ -161,22 +170,22 @@ export function AssessmentRunner({
         // mastered. Hint usage is captured in the `hinted` column but does
         // not downgrade the label.
         const label: ResultLabel = "mastered";
+        await recordAttempt(1, letter, true, label, !!s.hint);
         setCurrent({
           selected: letter,
           firstSelected: letter,
           phase: "feedback",
           label,
         });
-        recordAttempt(1, letter, true, label, !!s.hint);
         return;
       }
-      // wrong first → log attempt 1, show hint, allow second try
+      // wrong first → persist attempt 1 before hint UI so finish/PDF never races DB
+      await recordAttempt(1, letter, false, null, false);
       setCurrent({
         selected: null,
         firstSelected: letter,
         phase: "hint",
       });
-      recordAttempt(1, letter, false, null, false);
       fetchHint(letter);
       return;
     }
@@ -184,12 +193,12 @@ export function AssessmentRunner({
     // phase === "hint" → second attempt
     if (isCorrect) {
       const label: ResultLabel = "soft_miss";
+      await recordAttempt(2, letter, true, label, true);
       setCurrent({ selected: letter, phase: "feedback", label });
-      recordAttempt(2, letter, true, label, true);
     } else {
       const label: ResultLabel = "hard_miss";
+      await recordAttempt(2, letter, false, label, true);
       setCurrent({ selected: letter, phase: "feedback", label });
-      recordAttempt(2, letter, false, label, true);
     }
   }
 
@@ -292,7 +301,9 @@ export function AssessmentRunner({
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
-              <Badge variant="outline">{q.section_code}</Badge>
+              <Badge variant="outline" className="text-left whitespace-normal font-normal leading-snug max-w-[min(100%,22rem)]">
+                {formatSectionDisplayLabel(q.section_code)}
+              </Badge>
               <span className="text-ink-muted capitalize">· {q.level}</span>
               {q.concept_id && (
                 <span

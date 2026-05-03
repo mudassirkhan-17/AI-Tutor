@@ -89,6 +89,41 @@ export type AssessmentSummary = {
   };
 };
 
+/**
+ * Cached `sessions.config.summary` may be `{}`, missing nested fields, or
+ * pre-migration — `predicted` alone is not enough (empty object is truthy).
+ */
+export function assessmentSummaryNeedsRefresh(
+  summary: AssessmentSummary | null,
+): boolean {
+  if (!summary || typeof summary.total_time_ms !== "number") return true;
+  if (!Array.isArray(summary.sections)) return true;
+  const p = summary.predicted;
+  if (!p || typeof p !== "object") return true;
+  for (const key of ["national", "state"] as const) {
+    const portion = p[key];
+    if (!portion || typeof portion !== "object") return true;
+    if (
+      typeof portion.pass_probability !== "number" ||
+      Number.isNaN(portion.pass_probability)
+    )
+      return true;
+    if (typeof portion.signal !== "string") return true;
+    if (
+      typeof portion.accuracy_pct !== "number" ||
+      Number.isNaN(portion.accuracy_pct)
+    )
+      return true;
+    if (typeof portion.total !== "number") return true;
+  }
+  if (
+    typeof p.combined_probability !== "number" ||
+    Number.isNaN(p.combined_probability)
+  )
+    return true;
+  return false;
+}
+
 /** Back-compat: older rows may still hold "lucky"; we count it as mastered. */
 function normalizeLabel(
   label: ResultLabel | "lucky" | null,
@@ -157,15 +192,41 @@ function buildPortionPrediction(
 }
 
 /**
+ * PostgREST may embed `question` as an object or a single-element array.
+ * Without normalizing, `question.section_code` is missing → rows dropped → total 0.
+ */
+function unwrapQuestionEmbed(raw: unknown): AttemptLite["question"] | null {
+  if (raw == null) return null;
+  const row = Array.isArray(raw) ? raw[0] : raw;
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  if (typeof r.section_code !== "string") return null;
+  const lv = r.level;
+  const level: AttemptLite["question"]["level"] =
+    lv === "easy" || lv === "medium" || lv === "hard" ? lv : "medium";
+  return {
+    id: typeof r.id === "string" ? r.id : "",
+    section_code: r.section_code,
+    concept_id: typeof r.concept_id === "string" ? r.concept_id : null,
+    level,
+  };
+}
+
+/**
  * Build a summary from raw attempts. We use the FIRST attempt per
  * question to derive the result_label (for quick re-derivation on the
  * results page if needed).
  */
 export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
+  const attemptsNorm = attempts.map((a) => {
+    const q = unwrapQuestionEmbed((a as { question?: unknown }).question);
+    return q ? { ...a, question: q } : a;
+  });
+
   // Total time aggregates across BOTH tries (1 + 2) so per-question time
   // reflects how long the student spent on the question end to end.
   const timeByQ = new Map<string, number>();
-  for (const a of attempts) {
+  for (const a of attemptsNorm) {
     if (typeof a.time_spent_ms !== "number" || a.time_spent_ms < 0) continue;
     timeByQ.set(
       a.question_id,
@@ -177,12 +238,14 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
   // (which is set on the LAST attempt for that question — first try if
   // mastered, second try otherwise).
   const byQ = new Map<string, AttemptLite>();
-  for (const a of attempts) {
+  for (const a of attemptsNorm) {
     const label = normalizeLabel(a.result_label as ResultLabel | "lucky" | null);
     if (!label) continue;
     byQ.set(a.question_id, { ...a, result_label: label });
   }
-  const rows = Array.from(byQ.values());
+  const rows = Array.from(byQ.values()).filter(
+    (r) => r.question && typeof r.question.section_code === "string",
+  );
 
   const sectionMap = new Map<string, SectionStat>();
   const conceptMap = new Map<string, ConceptStat>();

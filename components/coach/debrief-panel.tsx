@@ -24,12 +24,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { SECTIONS, type SectionCode } from "@/lib/constants";
 import {
   type DebriefPlan,
   DEFAULT_PLAN,
   sanitizePlan,
 } from "@/lib/coach/debrief-plan";
+import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ------------------------------ Types & props ----------------------------- */
 
@@ -582,11 +584,11 @@ function ChatStream({
                       className={cn(
                         "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
                         isUser
-                          ? "bg-primary text-primary-foreground"
+                          ? "whitespace-pre-wrap bg-primary text-primary-foreground"
                           : "bg-surface border border-border text-ink",
                       )}
                     >
-                      {text}
+                      {isUser ? text : <ChatMarkdown content={text} />}
                     </div>
                   );
                 }
@@ -901,9 +903,9 @@ function PlanPreview({
       </div>
       <div className="space-y-1">
         {preview.map((row) => (
-          <div key={row.code} className="flex items-center gap-2">
-            <span className="w-6 shrink-0 text-[10px] font-semibold tabular-nums text-ink-muted">
-              {row.code}
+          <div key={row.code} className="flex items-center gap-2 min-w-0">
+            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-ink-muted">
+              {formatSectionDisplayLabel(row.code)}
             </span>
             <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
               <motion.div
