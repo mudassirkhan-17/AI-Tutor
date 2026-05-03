@@ -244,27 +244,27 @@ const s = StyleSheet.create({
   },
   conceptRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 3,
+    alignItems: "flex-start",
+    paddingVertical: 4,
     borderBottomWidth: 1,
     borderBottomColor: "#F0E8DC",
-    gap: 8,
+    gap: 6,
   },
-  conceptTitle: { flex: 1, fontSize: 8, color: C.ink },
+  conceptTitle: { flex: 1, fontSize: 8, color: C.ink, minWidth: 0 },
   conceptSection: {
-    fontSize: 7,
+    fontSize: 6,
     color: C.primary,
     backgroundColor: C.primaryLight,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
     borderRadius: 3,
-    width: 22,
-    textAlign: "center",
+    width: "38%",
+    textAlign: "left",
   },
   conceptAccuracy: {
     fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
-    width: 36,
+    width: "18%",
     textAlign: "right",
   },
 
@@ -409,7 +409,7 @@ export function AssessmentPdf({
       author="SC Real Estate Prep"
       subject="SC Real Estate Salesperson Assessment"
     >
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={s.page} wrap>
         {/* ── HEADER ── */}
         <View style={s.header}>
           <View style={s.headerLeft}>

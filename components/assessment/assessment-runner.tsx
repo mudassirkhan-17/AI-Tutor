@@ -108,26 +108,34 @@ export function AssessmentRunner({
     hinted: boolean,
   ) {
     const now = Date.now();
-    try {
-      await fetch("/api/attempts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          question_id: q.id,
-          mode: "assessment",
-          user_answer: answer,
-          is_correct: isCorrect,
-          hinted,
-          retried: attempt === 2,
-          time_spent_ms: Math.max(0, now - s.attemptStart),
-          attempt_number: attempt,
-          result_label: label,
-        }),
-      });
-    } catch (e) {
-      console.error("recordAttempt", e);
+    const body = JSON.stringify({
+      session_id: sessionId,
+      question_id: q.id,
+      mode: "assessment",
+      user_answer: answer,
+      is_correct: isCorrect,
+      hinted,
+      retried: attempt === 2,
+      time_spent_ms: Math.max(0, now - s.attemptStart),
+      attempt_number: attempt,
+      result_label: label,
+    });
+    let lastErr = "";
+    for (let tryIdx = 0; tryIdx < 4; tryIdx++) {
+      try {
+        const res = await fetch("/api/attempts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        });
+        if (res.ok) return;
+        lastErr = await res.text().catch(() => res.statusText);
+      } catch (e) {
+        lastErr = String(e);
+      }
+      await new Promise((r) => setTimeout(r, 120 * (tryIdx + 1)));
     }
+    console.error("[assessment] recordAttempt failed after retries", lastErr);
   }
 
   async function fetchHint(wrongLetter: "A" | "B" | "C" | "D" | null) {

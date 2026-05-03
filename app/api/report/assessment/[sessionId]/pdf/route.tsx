@@ -1,5 +1,6 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
@@ -8,6 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 import { buildSummary } from "@/lib/assessment/summary";
 import { AssessmentPdf } from "@/lib/pdf/assessment-pdf";
 import type { DocumentProps } from "@react-pdf/renderer";
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export async function GET(
   _req: Request,
@@ -39,19 +44,30 @@ export async function GET(
     const tutorLetter: string | null =
       (config.tutor_letter as string | undefined) ?? null;
 
-    /* Always rebuild from DB — avoids stale config.summary and NaN when total was 0 */
-    const { data: attempts } = await supabase
-      .from("attempts")
-      .select(
-        "question_id, attempt_number, is_correct, result_label, time_spent_ms, question:questions(id, section_code, concept_id, level)",
-      )
-      .eq("session_id", sessionId)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
+    /* Always rebuild from DB; retry when total=0 (replica lag / race after Finish). */
+    const selectAttempts =
+      () =>
+      supabase
+        .from("attempts")
+        .select(
+          "question_id, attempt_number, is_correct, result_label, time_spent_ms, question:questions(id, section_code, concept_id, level)",
+        )
+        .eq("session_id", sessionId)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
 
-    const summary = buildSummary(
+    let attempts = (await selectAttempts()).data;
+    let summary = buildSummary(
       ((attempts ?? []) as unknown) as Parameters<typeof buildSummary>[0],
     );
+
+    for (let i = 0; i < 6 && summary.total < 1; i++) {
+      await sleep(220 * (i + 1));
+      attempts = (await selectAttempts()).data;
+      summary = buildSummary(
+        ((attempts ?? []) as unknown) as Parameters<typeof buildSummary>[0],
+      );
+    }
 
     if (summary.total < 1) {
       return NextResponse.json(

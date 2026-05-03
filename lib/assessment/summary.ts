@@ -192,15 +192,41 @@ function buildPortionPrediction(
 }
 
 /**
+ * PostgREST may embed `question` as an object or a single-element array.
+ * Without normalizing, `question.section_code` is missing → rows dropped → total 0.
+ */
+function unwrapQuestionEmbed(raw: unknown): AttemptLite["question"] | null {
+  if (raw == null) return null;
+  const row = Array.isArray(raw) ? raw[0] : raw;
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  if (typeof r.section_code !== "string") return null;
+  const lv = r.level;
+  const level: AttemptLite["question"]["level"] =
+    lv === "easy" || lv === "medium" || lv === "hard" ? lv : "medium";
+  return {
+    id: typeof r.id === "string" ? r.id : "",
+    section_code: r.section_code,
+    concept_id: typeof r.concept_id === "string" ? r.concept_id : null,
+    level,
+  };
+}
+
+/**
  * Build a summary from raw attempts. We use the FIRST attempt per
  * question to derive the result_label (for quick re-derivation on the
  * results page if needed).
  */
 export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
+  const attemptsNorm = attempts.map((a) => {
+    const q = unwrapQuestionEmbed((a as { question?: unknown }).question);
+    return q ? { ...a, question: q } : a;
+  });
+
   // Total time aggregates across BOTH tries (1 + 2) so per-question time
   // reflects how long the student spent on the question end to end.
   const timeByQ = new Map<string, number>();
-  for (const a of attempts) {
+  for (const a of attemptsNorm) {
     if (typeof a.time_spent_ms !== "number" || a.time_spent_ms < 0) continue;
     timeByQ.set(
       a.question_id,
@@ -212,7 +238,7 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
   // (which is set on the LAST attempt for that question — first try if
   // mastered, second try otherwise).
   const byQ = new Map<string, AttemptLite>();
-  for (const a of attempts) {
+  for (const a of attemptsNorm) {
     const label = normalizeLabel(a.result_label as ResultLabel | "lucky" | null);
     if (!label) continue;
     byQ.set(a.question_id, { ...a, result_label: label });
