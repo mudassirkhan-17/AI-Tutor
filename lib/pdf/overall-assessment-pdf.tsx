@@ -435,6 +435,11 @@ function accuracyColor(pct: number): string {
   return C.danger;
 }
 
+function pctOf(part: number, total: number): number {
+  const t = Math.max(total, 1);
+  return Math.round((part / t) * 100);
+}
+
 function passProbColor(prob: number): string {
   if (prob >= 0.7) return C.success;
   if (prob >= 0.5) return C.warn;
@@ -558,19 +563,19 @@ export function OverallAssessmentPdf({
                 <View style={[s.statDot, { backgroundColor: C.success }]} />
                 <Text style={s.statLabel}>Mastered (first try)</Text>
                 <Text style={s.statValue}>{summary.mastered}</Text>
-                <Text style={s.statPct}>{Math.round((summary.mastered / summary.total) * 100)}%</Text>
+                <Text style={s.statPct}>{pctOf(summary.mastered, summary.total)}%</Text>
               </View>
               <View style={s.statRow}>
                 <View style={[s.statDot, { backgroundColor: C.warn }]} />
                 <Text style={s.statLabel}>Recovered (hint/retry)</Text>
                 <Text style={s.statValue}>{summary.soft_miss}</Text>
-                <Text style={s.statPct}>{Math.round((summary.soft_miss / summary.total) * 100)}%</Text>
+                <Text style={s.statPct}>{pctOf(summary.soft_miss, summary.total)}%</Text>
               </View>
               <View style={s.statRow}>
                 <View style={[s.statDot, { backgroundColor: C.danger }]} />
                 <Text style={s.statLabel}>Hard miss (needs review)</Text>
                 <Text style={s.statValue}>{summary.hard_miss}</Text>
-                <Text style={s.statPct}>{Math.round((summary.hard_miss / summary.total) * 100)}%</Text>
+                <Text style={s.statPct}>{pctOf(summary.hard_miss, summary.total)}%</Text>
               </View>
               <View style={[s.statRow, { marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: C.border }]}>
                 <Text style={[s.statLabel, { color: C.ink }]}>Effective score (mastered + recovered)</Text>

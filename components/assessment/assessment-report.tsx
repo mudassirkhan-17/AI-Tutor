@@ -1478,7 +1478,14 @@ function DownloadPdfButton({
         : `/api/report/assessment/${sessionId}/pdf`;
 
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to generate PDF");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        const msg =
+          errBody && typeof errBody === "object" && "error" in errBody
+            ? String((errBody as { error?: string }).error)
+            : "Failed to generate PDF";
+        throw new Error(msg);
+      }
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -1491,7 +1498,9 @@ function DownloadPdfButton({
       a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (err) {
-      toast.error("Could not generate PDF. Please try again.");
+      const msg =
+        err instanceof Error ? err.message : "Could not generate PDF.";
+      toast.error(msg);
       console.error("[PDF download]", err);
     } finally {
       setLoading(false);

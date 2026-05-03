@@ -162,22 +162,22 @@ export function AssessmentRunner({
         // mastered. Hint usage is captured in the `hinted` column but does
         // not downgrade the label.
         const label: ResultLabel = "mastered";
+        await recordAttempt(1, letter, true, label, !!s.hint);
         setCurrent({
           selected: letter,
           firstSelected: letter,
           phase: "feedback",
           label,
         });
-        recordAttempt(1, letter, true, label, !!s.hint);
         return;
       }
-      // wrong first → log attempt 1, show hint, allow second try
+      // wrong first → persist attempt 1 before hint UI so finish/PDF never races DB
+      await recordAttempt(1, letter, false, null, false);
       setCurrent({
         selected: null,
         firstSelected: letter,
         phase: "hint",
       });
-      recordAttempt(1, letter, false, null, false);
       fetchHint(letter);
       return;
     }
@@ -185,12 +185,12 @@ export function AssessmentRunner({
     // phase === "hint" → second attempt
     if (isCorrect) {
       const label: ResultLabel = "soft_miss";
+      await recordAttempt(2, letter, true, label, true);
       setCurrent({ selected: letter, phase: "feedback", label });
-      recordAttempt(2, letter, true, label, true);
     } else {
       const label: ResultLabel = "hard_miss";
+      await recordAttempt(2, letter, false, label, true);
       setCurrent({ selected: letter, phase: "feedback", label });
-      recordAttempt(2, letter, false, label, true);
     }
   }
 

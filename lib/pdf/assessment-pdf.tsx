@@ -318,6 +318,12 @@ function accuracyColor(pct: number) {
   return C.danger;
 }
 
+/** Avoid NaN in react-pdf when total is 0 */
+function pctOf(part: number, total: number): number {
+  const t = Math.max(total, 1);
+  return Math.round((part / t) * 100);
+}
+
 /* Donut circle using SVG */
 function ScoreDonut({ pct }: { pct: number }) {
   const r = 38;
@@ -390,8 +396,12 @@ export function AssessmentPdf({
   const national = summary.predicted.national;
   const state = summary.predicted.state;
 
-  const passProbColor = (prob: number) =>
-    prob >= 0.7 ? C.success : prob >= 0.5 ? C.warn : C.danger;
+  const passPctDisplay = (prob: number) =>
+    Number.isFinite(prob) ? Math.round(prob * 100) : 0;
+  const passProbColor = (prob: number) => {
+    const p = Number.isFinite(prob) ? prob : 0;
+    return p >= 0.7 ? C.success : p >= 0.5 ? C.warn : C.danger;
+  };
 
   return (
     <Document
@@ -424,25 +434,19 @@ export function AssessmentPdf({
                 />
                 <Text style={s.statLabel}>Mastered (first try)</Text>
                 <Text style={s.statValue}>{summary.mastered}</Text>
-                <Text style={s.statPct}>
-                  {Math.round((summary.mastered / summary.total) * 100)}%
-                </Text>
+                <Text style={s.statPct}>{pctOf(summary.mastered, summary.total)}%</Text>
               </View>
               <View style={s.statRow}>
                 <View style={[s.statDot, { backgroundColor: C.warn }]} />
                 <Text style={s.statLabel}>Recovered (hint/retry)</Text>
                 <Text style={s.statValue}>{summary.soft_miss}</Text>
-                <Text style={s.statPct}>
-                  {Math.round((summary.soft_miss / summary.total) * 100)}%
-                </Text>
+                <Text style={s.statPct}>{pctOf(summary.soft_miss, summary.total)}%</Text>
               </View>
               <View style={s.statRow}>
                 <View style={[s.statDot, { backgroundColor: C.danger }]} />
                 <Text style={s.statLabel}>Hard miss (needs review)</Text>
                 <Text style={s.statValue}>{summary.hard_miss}</Text>
-                <Text style={s.statPct}>
-                  {Math.round((summary.hard_miss / summary.total) * 100)}%
-                </Text>
+                <Text style={s.statPct}>{pctOf(summary.hard_miss, summary.total)}%</Text>
               </View>
               <View
                 style={[
@@ -557,7 +561,7 @@ export function AssessmentPdf({
                   { color: passProbColor(national.pass_probability) },
                 ]}
               >
-                {Math.round(national.pass_probability * 100)}%
+                {passPctDisplay(national.pass_probability)}%
               </Text>
               <Text style={s.predPctSub}>
                 chance of passing · {national.accuracy_pct}% accuracy on{" "}
@@ -572,7 +576,7 @@ export function AssessmentPdf({
                   { color: passProbColor(state.pass_probability) },
                 ]}
               >
-                {Math.round(state.pass_probability * 100)}%
+                {passPctDisplay(state.pass_probability)}%
               </Text>
               <Text style={s.predPctSub}>
                 chance of passing · {state.accuracy_pct}% accuracy on{" "}
@@ -591,7 +595,7 @@ export function AssessmentPdf({
                   },
                 ]}
               >
-                {Math.round(summary.predicted.combined_probability * 100)}%
+                {passPctDisplay(summary.predicted.combined_probability)}%
               </Text>
               <Text style={s.predPctSub}>
                 of passing both portions

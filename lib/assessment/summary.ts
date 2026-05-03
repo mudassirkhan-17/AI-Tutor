@@ -89,6 +89,41 @@ export type AssessmentSummary = {
   };
 };
 
+/**
+ * Cached `sessions.config.summary` may be `{}`, missing nested fields, or
+ * pre-migration — `predicted` alone is not enough (empty object is truthy).
+ */
+export function assessmentSummaryNeedsRefresh(
+  summary: AssessmentSummary | null,
+): boolean {
+  if (!summary || typeof summary.total_time_ms !== "number") return true;
+  if (!Array.isArray(summary.sections)) return true;
+  const p = summary.predicted;
+  if (!p || typeof p !== "object") return true;
+  for (const key of ["national", "state"] as const) {
+    const portion = p[key];
+    if (!portion || typeof portion !== "object") return true;
+    if (
+      typeof portion.pass_probability !== "number" ||
+      Number.isNaN(portion.pass_probability)
+    )
+      return true;
+    if (typeof portion.signal !== "string") return true;
+    if (
+      typeof portion.accuracy_pct !== "number" ||
+      Number.isNaN(portion.accuracy_pct)
+    )
+      return true;
+    if (typeof portion.total !== "number") return true;
+  }
+  if (
+    typeof p.combined_probability !== "number" ||
+    Number.isNaN(p.combined_probability)
+  )
+    return true;
+  return false;
+}
+
 /** Back-compat: older rows may still hold "lucky"; we count it as mastered. */
 function normalizeLabel(
   label: ResultLabel | "lucky" | null,
@@ -182,7 +217,9 @@ export function buildSummary(attempts: AttemptLite[]): AssessmentSummary {
     if (!label) continue;
     byQ.set(a.question_id, { ...a, result_label: label });
   }
-  const rows = Array.from(byQ.values());
+  const rows = Array.from(byQ.values()).filter(
+    (r) => r.question && typeof r.question.section_code === "string",
+  );
 
   const sectionMap = new Map<string, SectionStat>();
   const conceptMap = new Map<string, ConceptStat>();
