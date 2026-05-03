@@ -389,10 +389,6 @@ function fmtMs(ms: number): string {
   return `${ss}s`;
 }
 
-function pctRound(c: number, t: number) {
-  return t > 0 ? Math.round((c / t) * 100) : 0;
-}
-
 function scoreColor(pct: number, passPct: number): string {
   if (pct >= passPct) return C.success;
   if (pct >= passPct - 8) return C.warn;
@@ -965,7 +961,7 @@ export function FinalPdf({
                       {probPct}%
                     </Text>
                     <Text style={{ fontSize: 7, color: C.inkMuted, marginTop: 2, lineHeight: 1.4 }}>
-                      Statistical estimate based on this session's per-portion accuracy
+                      Statistical estimate based on this session&apos;s per-portion accuracy
                     </Text>
                   </View>
                 </>

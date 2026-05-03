@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Svg,
   Circle,
-  Rect,
 } from "@react-pdf/renderer";
 import type { AssessmentSummary } from "@/lib/assessment/summary";
 import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
@@ -523,9 +522,6 @@ export function OverallAssessmentPdf({
   const state = summary.predicted.state;
   const nationalSections = summary.sections.filter((s) => s.code.startsWith("A"));
   const stateSections = summary.sections.filter((s) => s.code.startsWith("B"));
-
-  const topSection = [...summary.sections].sort((a, b) => b.accuracy - a.accuracy)[0];
-  const bottomSection = [...summary.sections].filter(s => s.total > 0).sort((a, b) => a.accuracy - b.accuracy)[0];
 
   return (
     <Document

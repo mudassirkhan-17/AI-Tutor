@@ -6,7 +6,6 @@ import {
   type AssessmentCoverage,
 } from "@/lib/assessment/coverage";
 import { hasFinishedPractice } from "@/lib/practice/completion";
-import { SECTIONS } from "@/lib/constants";
 import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
 

@@ -378,7 +378,7 @@ export interface AssessmentPdfProps {
 /* ─── Main PDF Document ─── */
 export function AssessmentPdf({
   summary,
-  sessionId,
+  sessionId: _sessionId,
   durationMs,
   conceptTitles,
   tutorLetter,

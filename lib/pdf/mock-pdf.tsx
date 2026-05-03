@@ -5,9 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Svg,
-  Circle,
-  Rect,
 } from "@react-pdf/renderer";
 import type {
   SectionRow,
@@ -393,9 +390,6 @@ export function MockPdf({
 
   const nationalPct = pctRound(nationalCorrect, nationalTotal);
   const statePct = pctRound(stateCorrect, stateTotal);
-  const easyPct = pctRound(difficulty.easy.correct, difficulty.easy.total);
-  const medPct = pctRound(difficulty.medium.correct, difficulty.medium.total);
-  const hardPct = pctRound(difficulty.hard.correct, difficulty.hard.total);
 
   const nationalSections = sections.filter((s) => s.group === "National");
   const stateSections = sections.filter((s) => s.group === "State");
