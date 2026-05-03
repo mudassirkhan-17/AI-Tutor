@@ -9,6 +9,10 @@ import {
   Circle,
 } from "@react-pdf/renderer";
 import type { AssessmentSummary } from "@/lib/assessment/summary";
+import {
+  donutArcStrokeDasharray,
+  donutShowColoredArc,
+} from "@/lib/pdf/donut-stroke";
 import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
 
 /* ─── Brand colours (matching app globals.css) ─── */
@@ -330,9 +334,8 @@ function ScoreDonut({ pct }: { pct: number }) {
   const cx = 45;
   const cy = 45;
   const circumference = 2 * Math.PI * r;
-  const filled = (pct / 100) * circumference;
-  const remaining = circumference - filled;
   const color = accuracyColor(pct);
+  const coloredDash = donutArcStrokeDasharray(pct, circumference);
   /* Rotate -90 so arc starts at top instead of right side */
   const rotateTransform = `rotate(-90, ${cx}, ${cy})`;
   return (
@@ -346,16 +349,18 @@ function ScoreDonut({ pct }: { pct: number }) {
           strokeWidth={7}
           fill="none"
         />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          stroke={color}
-          strokeWidth={7}
-          fill="none"
-          strokeDasharray={`${filled} ${remaining}`}
-          transform={rotateTransform}
-        />
+        {donutShowColoredArc(pct) && (
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke={color}
+            strokeWidth={7}
+            fill="none"
+            {...(coloredDash ? { strokeDasharray: coloredDash } : {})}
+            transform={rotateTransform}
+          />
+        )}
       </Svg>
       <View style={s.scoreInsideText}>
         <Text style={[s.scorePct, { color }]}>{pct}%</Text>
