@@ -24,6 +24,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import type { KpiHelpKey } from "@/components/kpi/kpi-help-copy";
+import { KpiInsightByKey } from "@/components/kpi/kpi-insight-tooltip";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import { toast } from "sonner";
@@ -162,6 +164,7 @@ function Hero({ stats, durationMs, sessionId }: { stats: MistakesStats; duration
                     ? "warn"
                     : "danger"
               }
+              helpKey="mistakes_headline_recovered"
             />
             <HeadlineMetric
               icon={Gauge}
@@ -175,6 +178,7 @@ function Hero({ stats, durationMs, sessionId }: { stats: MistakesStats; duration
                     ? "warn"
                     : "danger"
               }
+              helpKey="mistakes_headline_leaking"
             />
           </div>
 
@@ -227,6 +231,8 @@ function RecoveryRing({ stats }: { stats: MistakesStats }) {
 
   return (
     <div className="relative shrink-0 mx-auto" style={{ width: size, height: size }}>
+      <KpiInsightByKey k="mistakes_recovery_ring" className="rounded-full h-full w-full">
+        <div className="relative h-full w-full">
       <svg
         width={size}
         height={size}
@@ -290,6 +296,8 @@ function RecoveryRing({ stats }: { stats: MistakesStats }) {
           </div>
         </div>
       </div>
+        </div>
+      </KpiInsightByKey>
     </div>
   );
 }
@@ -300,18 +308,21 @@ function HeadlineMetric({
   caption,
   value,
   tone,
+  helpKey,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   caption: string;
   value: number;
   tone: "success" | "warn" | "danger";
+  helpKey: KpiHelpKey;
 }) {
   const toneCls =
     tone === "success" ? "text-success" : tone === "warn" ? "text-warn" : "text-danger";
   const trackCls =
     tone === "success" ? "bg-success" : tone === "warn" ? "bg-warn" : "bg-danger";
   return (
+    <KpiInsightByKey k={helpKey}>
     <div className="rounded-2xl border border-border bg-elevated/40 p-3.5">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-ink-muted">
         <Icon className={cn("h-3.5 w-3.5", toneCls)} />
@@ -333,6 +344,7 @@ function HeadlineMetric({
       </div>
       <p className="mt-1.5 text-[11px] text-ink-muted leading-snug">{caption}</p>
     </div>
+    </KpiInsightByKey>
   );
 }
 
@@ -348,6 +360,7 @@ function KpiGrid({ stats }: { stats: MistakesStats }) {
       label: "Fixed",
       value: stats.recovered,
       sub: `of ${stats.total} resurfaced`,
+      helpKey: "mistakes_fixed",
     },
     {
       icon: XCircle,
@@ -355,6 +368,7 @@ function KpiGrid({ stats }: { stats: MistakesStats }) {
       label: "Still leaking",
       value: stats.still_leaking,
       sub: `missed again`,
+      helpKey: "mistakes_leaking",
     },
     {
       icon: Lightbulb,
@@ -362,6 +376,7 @@ function KpiGrid({ stats }: { stats: MistakesStats }) {
       label: "Hint usage",
       value: `${stats.hint_pct}%`,
       sub: `${stats.hint_count} of ${stats.total} needed a hint`,
+      helpKey: "mistakes_hints",
     },
     {
       icon: Timer,
@@ -371,6 +386,7 @@ function KpiGrid({ stats }: { stats: MistakesStats }) {
       sub: stats.fastest_correct_ms
         ? `Fastest fix ${formatMs(stats.fastest_correct_ms)}`
         : `No timing data`,
+      helpKey: "mistakes_avg_time",
     },
   ];
   return (
@@ -388,10 +404,19 @@ type KpiTileProps = {
   label: string;
   value: number | string;
   sub: string;
+  helpKey: KpiHelpKey;
   index?: number;
 };
 
-function KpiTile({ icon: Icon, tone, label, value, sub, index = 0 }: KpiTileProps) {
+function KpiTile({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  sub,
+  helpKey,
+  index = 0,
+}: KpiTileProps) {
   const toneCls =
     tone === "success"
       ? "text-success bg-success/10 border-success/20"
@@ -405,7 +430,9 @@ function KpiTile({ icon: Icon, tone, label, value, sub, index = 0 }: KpiTileProp
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05 * index, duration: 0.3 }}
+      className="h-full"
     >
+      <KpiInsightByKey k={helpKey} className="h-full">
       <Card className="h-full">
         <CardContent className="p-4 flex flex-col gap-2">
           <div className={cn("h-9 w-9 grid place-items-center rounded-xl border", toneCls)}>
@@ -418,6 +445,7 @@ function KpiTile({ icon: Icon, tone, label, value, sub, index = 0 }: KpiTileProp
           <div className="text-[11px] text-ink-muted leading-snug">{sub}</div>
         </CardContent>
       </Card>
+      </KpiInsightByKey>
     </motion.div>
   );
 }

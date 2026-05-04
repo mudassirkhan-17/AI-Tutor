@@ -26,6 +26,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import type { KpiHelpKey } from "@/components/kpi/kpi-help-copy";
+import { KpiInsightByKey } from "@/components/kpi/kpi-insight-tooltip";
 import { cn, formatMs } from "@/lib/utils";
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import { toast } from "sonner";
@@ -807,6 +809,7 @@ function KpiGrid(props: {
       sub: passed
         ? `${score}% with the bar at ${props.passPct}%`
         : `${Math.abs(overshoot)} pts under the line`,
+      helpKey: "mock_margin",
     },
     {
       icon: Compass,
@@ -817,6 +820,7 @@ function KpiGrid(props: {
         nationalP >= stateP
           ? `Nat ${nationalP}% · SC ${stateP}%`
           : `SC ${stateP}% · Nat ${nationalP}%`,
+      helpKey: "mock_balance",
     },
     {
       icon: Flame,
@@ -824,6 +828,7 @@ function KpiGrid(props: {
       label: "Hard-question pulse",
       value: `${hardP}%`,
       sub: `Easy and medium tracked separately below`,
+      helpKey: "mock_hard_pulse",
     },
     {
       icon: Timer,
@@ -831,6 +836,7 @@ function KpiGrid(props: {
       label: "Avg per question",
       value: avgPerQuestionMs ? formatMs(avgPerQuestionMs) : "—",
       sub: `Real exam allows ~72 sec/Q`,
+      helpKey: "mock_avg_time",
     },
     {
       icon: AlertTriangle,
@@ -841,6 +847,7 @@ function KpiGrid(props: {
         weakCount === 0
           ? `Every section cleared the bar`
           : `Lifting top ${Math.min(weakCount, 3)} would add ~${recoverPoints} pts`,
+      helpKey: "mock_weak_sections",
     },
   ];
 
@@ -859,6 +866,7 @@ type KpiTileProps = {
   label: string;
   value: number | string;
   sub: string;
+  helpKey: KpiHelpKey;
   index?: number;
 };
 
@@ -868,6 +876,7 @@ function KpiTile({
   label,
   value,
   sub,
+  helpKey,
   index = 0,
 }: KpiTileProps) {
   const toneCls =
@@ -883,7 +892,9 @@ function KpiTile({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05 * index, duration: 0.3 }}
+      className="h-full"
     >
+      <KpiInsightByKey k={helpKey} className="h-full">
       <Card className="h-full">
         <CardContent className="p-4 flex flex-col gap-2">
           <div
@@ -903,6 +914,7 @@ function KpiTile({
           <div className="text-[11px] text-ink-muted leading-snug">{sub}</div>
         </CardContent>
       </Card>
+      </KpiInsightByKey>
     </motion.div>
   );
 }

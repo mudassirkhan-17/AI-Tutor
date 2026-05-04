@@ -36,6 +36,8 @@ import type {
 import { useChatSheet } from "@/components/chat/chat-sheet-provider";
 import { toast } from "sonner";
 import { formatSectionDisplayLabel } from "@/lib/sections/display-label";
+import type { KpiHelpKey } from "@/components/kpi/kpi-help-copy";
+import { KpiInsightByKey } from "@/components/kpi/kpi-insight-tooltip";
 
 // SC salesperson exam pass line.
 const PASS_THRESHOLD = 70;
@@ -180,6 +182,7 @@ export function AssessmentReport({
                 value={strict}
                 threshold={PASS_THRESHOLD}
                 emphasis
+                insightKey="first_try_mastery"
               />
               <MetricBlock
                 icon={Gauge}
@@ -187,6 +190,7 @@ export function AssessmentReport({
                 caption="Right after a hint or on the second try."
                 value={reach}
                 threshold={PASS_THRESHOLD}
+                insightKey="with_support"
               />
             </div>
           </div>
@@ -211,6 +215,7 @@ export function AssessmentReport({
           value={summary.mastered}
           total={summary.total}
           tone="success"
+          insightKey="locked_in"
         />
         <StatTile
           icon={TrendingUp}
@@ -219,6 +224,7 @@ export function AssessmentReport({
           value={summary.soft_miss}
           total={summary.total}
           tone="warn-strong"
+          insightKey="recovered"
         />
         <StatTile
           icon={BookOpen}
@@ -227,6 +233,7 @@ export function AssessmentReport({
           value={summary.hard_miss}
           total={summary.total}
           tone="danger"
+          insightKey="needs_review"
         />
       </section>
 
@@ -424,7 +431,11 @@ function CompositionRing({ summary }: { summary: AssessmentSummary }) {
   const center = size / 2;
 
   return (
-    <div className="relative h-[176px] w-[176px] shrink-0 mx-auto">
+    <KpiInsightByKey
+      k="composition_ring"
+      className="rounded-full shrink-0 mx-auto h-[176px] w-[176px]"
+    >
+      <div className="relative h-full w-full">
       <svg
         width={size}
         height={size}
@@ -477,7 +488,8 @@ function CompositionRing({ summary }: { summary: AssessmentSummary }) {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </KpiInsightByKey>
   );
 }
 
@@ -488,6 +500,7 @@ function MetricBlock({
   value,
   threshold,
   emphasis,
+  insightKey,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
@@ -495,9 +508,11 @@ function MetricBlock({
   value: number;
   threshold: number;
   emphasis?: boolean;
+  insightKey: KpiHelpKey;
 }) {
   const passed = value >= threshold;
   return (
+    <KpiInsightByKey k={insightKey}>
     <div
       className={cn(
         "rounded-2xl border p-4",
@@ -531,6 +546,7 @@ function MetricBlock({
       </div>
       <p className="mt-1.5 text-xs text-ink-muted leading-snug">{caption}</p>
     </div>
+    </KpiInsightByKey>
   );
 }
 
@@ -538,16 +554,28 @@ function ExamReadinessBar({ strict, reach }: { strict: number; reach: number }) 
   return (
     <div className="mt-6 pt-5 border-t border-border/60 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
+        <KpiInsightByKey k="exam_readiness" className="rounded-xl w-fit">
+          <div className="flex items-center gap-2 py-0.5 pr-1">
           <Gauge className="h-4 w-4 text-ink-muted" />
           <span className="text-sm font-medium">Exam readiness</span>
-        </div>
+          </div>
+        </KpiInsightByKey>
         <span className="text-xs text-ink-muted">
           SC pass line · {PASS_THRESHOLD}%
         </span>
       </div>
-      <MarkerBar label="First-try" pct={strict} color="bg-primary" />
-      <MarkerBar label="With support" pct={reach} color="bg-success/60" />
+      <MarkerBar
+        label="First-try"
+        pct={strict}
+        color="bg-primary"
+        insightKey="readiness_first_try"
+      />
+      <MarkerBar
+        label="With support"
+        pct={reach}
+        color="bg-success/60"
+        insightKey="readiness_with_support"
+      />
     </div>
   );
 }
@@ -556,13 +584,16 @@ function MarkerBar({
   label,
   pct,
   color,
+  insightKey,
 }: {
   label: string;
   pct: number;
   color: string;
+  insightKey: KpiHelpKey;
 }) {
   const passed = pct >= PASS_THRESHOLD;
   return (
+    <KpiInsightByKey k={insightKey} className="rounded-xl">
     <div>
       <div className="flex items-center justify-between mb-1.5 text-xs">
         <span className="text-ink-muted">{label}</span>
@@ -587,6 +618,7 @@ function MarkerBar({
         />
       </div>
     </div>
+    </KpiInsightByKey>
   );
 }
 
@@ -599,6 +631,7 @@ function StatTile({
   value,
   total,
   tone,
+  insightKey,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -606,10 +639,12 @@ function StatTile({
   value: number;
   total: number;
   tone: Tone;
+  insightKey: KpiHelpKey;
 }) {
   const t = TONES[tone];
   const pct = total ? Math.round((100 * value) / total) : 0;
   return (
+    <KpiInsightByKey k={insightKey}>
     <div className={cn("rounded-2xl border p-4", t.ring, t.bg)}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -631,6 +666,7 @@ function StatTile({
       </div>
       <div className="mt-1 text-xs text-ink-muted leading-snug">{sub}</div>
     </div>
+    </KpiInsightByKey>
   );
 }
 
@@ -843,10 +879,12 @@ function PassProbabilityPanel({ summary }: { summary: AssessmentSummary }) {
           <PortionProbCard
             label="National (80 Q · 70%)"
             portion={p.national}
+            insightKey="pass_prob_national"
           />
           <PortionProbCard
             label="South Carolina (40 Q · 70%)"
             portion={p.state}
+            insightKey="pass_prob_state"
           />
           <CombinedProbCard
             pct={combinedPct}
@@ -865,9 +903,11 @@ function PassProbabilityPanel({ summary }: { summary: AssessmentSummary }) {
 function PortionProbCard({
   label,
   portion,
+  insightKey,
 }: {
   label: string;
   portion: AssessmentSummary["predicted"]["national"];
+  insightKey: KpiHelpKey;
 }) {
   const pct = Math.round(portion.pass_probability * 100);
   const tone =
@@ -880,6 +920,7 @@ function PortionProbCard({
         ? "Medium signal"
         : "Low signal";
   return (
+    <KpiInsightByKey k={insightKey}>
     <div className={cn("rounded-2xl border p-4", t.ring, t.bg)}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-ink">{label}</span>
@@ -905,6 +946,7 @@ function PortionProbCard({
         />
       </div>
     </div>
+    </KpiInsightByKey>
   );
 }
 
@@ -913,6 +955,7 @@ function CombinedProbCard({ pct, note }: { pct: number; note: string }) {
     pct >= 60 ? "success" : pct >= 30 ? "warn-strong" : "danger";
   const t = TONES[tone];
   return (
+    <KpiInsightByKey k="pass_prob_combined">
     <div className={cn("rounded-2xl border p-4", t.ring, "bg-surface")}>
       <div className="flex items-center gap-2">
         <Sparkles className={cn("h-4 w-4", t.text)} />
@@ -928,6 +971,7 @@ function CombinedProbCard({ pct, note }: { pct: number; note: string }) {
       </div>
       <p className="mt-2 text-xs text-ink-muted leading-snug">{note}</p>
     </div>
+    </KpiInsightByKey>
   );
 }
 
