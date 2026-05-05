@@ -1164,13 +1164,18 @@ function SectionRadarCard({
   return (
     <Card className="h-full">
       <CardContent className="pt-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-1">
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 text-primary" />
             <h3 className="font-semibold">Mastery radar</h3>
           </div>
-          <span className="text-xs text-ink-muted">First-try accuracy</span>
+          <span className="text-xs text-ink-muted shrink-0">First-try accuracy</span>
         </div>
+        <p className="text-[11px] text-ink-muted leading-snug mb-4 max-w-md">
+          Each spoke is a section you assessed. Distance from the center is that
+          section&apos;s first-try % (center = 0%, outer ring = 100%). The dashed
+          ring marks 70% — South Carolina&apos;s typical pass bar.
+        </p>
         {sections.length < 3 ? (
           <div className="text-sm text-ink-muted py-6 text-center">
             Assess at least 3 sections to see the radar.
@@ -1221,8 +1226,23 @@ function SectionRadarSvg({
         viewBox={`0 0 ${size} ${size}`}
         className="w-full h-auto block"
         role="img"
-        aria-label="Section mastery radar"
+        aria-label="Radar chart: each axis is a section, distance from center is first-try accuracy percent, dashed ring is seventy percent pass bar"
       >
+        {/* % scale labels along the top (12 o'clock) */}
+        {[25, 50, 75, 100].map((pct) => {
+          const frac = pct / 100;
+          return (
+            <text
+              key={pct}
+              x={cx + 5}
+              y={cy - r * frac + 3}
+              className="fill-ink-muted"
+              fontSize={9}
+            >
+              {pct}%
+            </text>
+          );
+        })}
         {/* Background rings */}
         {rings.map((v, i) => (
           <circle
@@ -1247,6 +1267,15 @@ function SectionRadarSvg({
           strokeOpacity={0.45}
           className="text-primary"
         />
+        <text
+          x={cx + r * passV * 0.65}
+          y={cy - r * passV * 0.65 - 4}
+          className="fill-primary"
+          fontSize={8}
+          opacity={0.85}
+        >
+          70%
+        </text>
         {/* Spokes */}
         {rows.map((_, i) => {
           const ang = angleFor(i);
@@ -1300,15 +1329,21 @@ function SectionRadarSvg({
           );
         })}
       </svg>
-      <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-ink-muted justify-center">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-primary" />
-          Your accuracy
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-px w-4 border-t border-dashed border-primary" />
-          70% pass line
-        </span>
+      <div className="mt-3 flex flex-col items-center gap-2">
+        <div className="flex items-center gap-3 flex-wrap text-xs text-ink-muted justify-center">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-primary" />
+            Purple area = your first-try % per section
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-px w-4 border-t border-dashed border-primary" />
+            Dashed ring = 70% pass bar
+          </span>
+        </div>
+        <p className="text-[10px] text-ink-muted/90 text-center max-w-sm leading-snug">
+          Rings at 25% / 50% / 75% / 100% help you read how close each corner is
+          to the edge.
+        </p>
       </div>
     </div>
   );

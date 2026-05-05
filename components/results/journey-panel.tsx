@@ -296,22 +296,20 @@ function CombinedTimeline({
   }
 
   const w = 600;
-  const h = 110;
-  const padX = 12;
+  const h = 124;
+  const padL = 34;
+  const padR = 12;
   const padY = 14;
-  const innerW = w - padX * 2;
-  const innerH = h - padY * 2;
+  const padB = 6;
+  const innerW = w - padL - padR;
+  const innerH = h - padY - padB;
   const stepX = scored.length > 1 ? innerW / (scored.length - 1) : 0;
   const yFor = (p: number) => padY + (1 - p / 100) * innerH;
-  const xFor = (i: number) => padX + i * stepX;
-
-  const linePath = scored
-    .map((s, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(s.score_pct).toFixed(1)}`)
-    .join(" ");
+  const xFor = (i: number) => padL + i * stepX;
 
   return (
     <div className="rounded-xl border border-border bg-elevated/30 p-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[11px] text-ink-muted">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1 text-[11px] text-ink-muted">
         {MODE_ORDER.map((m) => (
           <div key={m} className="inline-flex items-center gap-1.5">
             <span
@@ -326,16 +324,36 @@ function CombinedTimeline({
         ))}
         <span className="ml-auto">Earliest → Latest</span>
       </div>
+      <p className="text-[10px] text-ink-muted leading-snug mb-2">
+        Each dot is one finished session (color = that run&apos;s mode). Segments
+        between dots use the <span className="font-medium text-ink">later</span>{" "}
+        session&apos;s color — mixed-mode history, not a single continuous metric.
+        Vertical axis: score % for that session.
+      </p>
       <svg
         viewBox={`0 0 ${w} ${h}`}
         preserveAspectRatio="none"
         className="w-full h-[140px]"
+        role="img"
+        aria-label="Journey timeline: colored dots are sessions by mode, y-axis is percent score"
       >
+        {[100, 75, 50, 25, 0].map((g) => (
+          <text
+            key={`yl-${g}`}
+            x={padL - 5}
+            y={yFor(g) + 3}
+            textAnchor="end"
+            className="fill-ink-muted"
+            fontSize={8}
+          >
+            {g}
+          </text>
+        ))}
         {[25, 50, 75].map((g) => (
           <line
             key={g}
-            x1={padX}
-            x2={w - padX}
+            x1={padL}
+            x2={w - padR}
             y1={yFor(g)}
             y2={yFor(g)}
             className="stroke-border"
@@ -344,8 +362,8 @@ function CombinedTimeline({
           />
         ))}
         <line
-          x1={padX}
-          x2={w - padX}
+          x1={padL}
+          x2={w - padR}
           y1={yFor(70)}
           y2={yFor(70)}
           className="stroke-success/60"
@@ -353,20 +371,30 @@ function CombinedTimeline({
           strokeDasharray="3 3"
         />
         <text
-          x={w - padX}
+          x={w - padR}
           y={yFor(70) - 2}
           textAnchor="end"
-          className="fill-success text-[8px]"
+          className="fill-success"
+          fontSize={8}
         >
-          Pass bar
+          70% bar
         </text>
-        <path
-          d={linePath}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.2}
-          className="text-ink-muted/50"
-        />
+        {scored.slice(0, -1).map((s, i) => {
+          const next = scored[i + 1];
+          const meta = MODE_META[next.mode];
+          return (
+            <line
+              key={`${s.id}-${next.id}`}
+              x1={xFor(i)}
+              y1={yFor(s.score_pct)}
+              x2={xFor(i + 1)}
+              y2={yFor(next.score_pct)}
+              className={cn(meta.stroke, "opacity-[0.85]")}
+              strokeWidth={1.6}
+              strokeLinecap="round"
+            />
+          );
+        })}
         {scored.map((s, i) => {
           const meta = MODE_META[s.mode];
           const isCurrent = currentSessionId === s.id;

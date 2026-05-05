@@ -605,6 +605,26 @@ function ComparisonPanel({
               </div>
             )}
 
+            <div className="rounded-xl border border-border/80 bg-elevated/30 px-3 py-2.5">
+              <p className="text-[10px] font-medium text-ink mb-2 uppercase tracking-wide">
+                How to read the bars
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] text-ink-muted leading-snug">
+                <span className="inline-flex items-center gap-2 max-w-[200px]">
+                  <span className="h-2.5 w-10 shrink-0 rounded-full bg-ink/15" />
+                  Gray fill = your prior first-try % (baseline width)
+                </span>
+                <span className="inline-flex items-center gap-2 max-w-[200px]">
+                  <span className="h-2.5 w-10 shrink-0 rounded-full bg-success/60" />
+                  Green / red band = movement from baseline to this run
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-3 w-px shrink-0 rounded-full bg-ink/70" />
+                  Thin vertical tick = this run&apos;s first-try %
+                </span>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               {rows.map((r) => (
                 <DeltaBar key={r.code} row={r} />
@@ -759,9 +779,15 @@ function DifficultyCard({ stats }: { stats: PracticeStats }) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <Trophy className="h-4 w-4 text-primary" />
-          <h3 className="font-semibold">Accuracy by difficulty</h3>
+        <div>
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold">Accuracy by difficulty</h3>
+          </div>
+          <p className="text-[11px] text-ink-muted mt-1 leading-snug">
+            First-try accuracy only, split by how each question is tagged (easy /
+            medium / hard) in the bank.
+          </p>
         </div>
         <div className="space-y-3">
           {stats.byDifficulty.map((d) => (
@@ -840,74 +866,106 @@ function TrendCard({ stats }: { stats: PracticeStats }) {
 }
 
 function TrendChart({ values }: { values: number[] }) {
+  const gradId = React.useId().replace(/:/g, "");
   if (!values.length) {
     return (
       <div className="text-sm text-ink-muted">No trend data.</div>
     );
   }
   const w = 600;
-  const h = 140;
-  const padX = 8;
-  const padY = 8;
-  const innerW = w - padX * 2;
-  const innerH = h - padY * 2;
+  const h = 154;
+  const padL = 34;
+  const padR = 10;
+  const padT = 10;
+  const padB = 22;
+  const innerW = w - padL - padR;
+  const innerH = h - padT - padB;
   const stepX = values.length > 1 ? innerW / (values.length - 1) : 0;
-  const yFor = (v: number) => padY + innerH - (v / 100) * innerH;
-  const points = values.map((v, i) => `${padX + i * stepX},${yFor(v)}`);
+  const yFor = (v: number) => padT + innerH - (v / 100) * innerH;
+  const points = values.map((v, i) => `${padL + i * stepX},${yFor(v)}`);
   const line = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p}`).join(" ");
   const area =
-    `${line} L ${padX + (values.length - 1) * stepX} ${padY + innerH} L ${padX} ${padY + innerH} Z`;
+    `${line} L ${padL + (values.length - 1) * stepX} ${padT + innerH} L ${padL} ${padT + innerH} Z`;
 
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="w-full h-[140px]"
-      preserveAspectRatio="none"
-    >
-      <defs>
-        <linearGradient id="trendGrad" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* Pass-line guide at 70%. */}
-      <line
-        x1={padX}
-        x2={padX + innerW}
-        y1={yFor(70)}
-        y2={yFor(70)}
-        stroke="currentColor"
-        className="text-success"
-        strokeOpacity={0.35}
-        strokeDasharray="4 4"
-      />
-      <text
-        x={padX + innerW - 4}
-        y={yFor(70) - 4}
-        textAnchor="end"
-        className="fill-success"
-        fontSize="10"
-        opacity={0.7}
+    <div className="space-y-1">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="w-full h-[154px]"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Line chart: vertical axis is rolling first-try accuracy percent, horizontal axis is question order in this run"
       >
-        pass line
-      </text>
-      <path d={area} fill="url(#trendGrad)" />
-      <path
-        d={line}
-        fill="none"
-        stroke="hsl(var(--primary))"
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* End dot */}
-      <circle
-        cx={padX + (values.length - 1) * stepX}
-        cy={yFor(values[values.length - 1])}
-        r={4}
-        fill="hsl(var(--primary))"
-      />
-    </svg>
+        <defs>
+          <linearGradient id={`trendGrad-${gradId}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Y-axis % labels */}
+        {[100, 70, 50, 0].map((pct) => (
+          <text
+            key={pct}
+            x={padL - 4}
+            y={yFor(pct) + 3}
+            textAnchor="end"
+            className="fill-ink-muted"
+            fontSize={9}
+          >
+            {pct}
+          </text>
+        ))}
+        {/* Pass-line guide at 70%. */}
+        <line
+          x1={padL}
+          x2={padL + innerW}
+          y1={yFor(70)}
+          y2={yFor(70)}
+          stroke="currentColor"
+          className="text-success"
+          strokeOpacity={0.35}
+          strokeDasharray="4 4"
+        />
+        <text
+          x={padL + innerW - 2}
+          y={yFor(70) - 4}
+          textAnchor="end"
+          className="fill-success"
+          fontSize={9}
+          opacity={0.75}
+        >
+          70% pass
+        </text>
+        <path d={area} fill={`url(#trendGrad-${gradId})`} />
+        <path
+          d={line}
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle
+          cx={padL + (values.length - 1) * stepX}
+          cy={yFor(values[values.length - 1])}
+          r={4}
+          fill="hsl(var(--primary))"
+        />
+        <text
+          x={padL + innerW / 2}
+          y={h - 4}
+          textAnchor="middle"
+          className="fill-ink-muted"
+          fontSize={9}
+        >
+          Question order in this run →
+        </text>
+      </svg>
+      <p className="text-[10px] text-ink-muted leading-snug px-0.5">
+        Vertical axis: rolling first-try accuracy (%). Each step adds the next
+        question; the line shows how your running average moved.
+      </p>
+    </div>
   );
 }
 
